@@ -16,63 +16,17 @@ const themeStyles = `
     transition: all 0.2s ease-in-out !important;
   }
 
-  /* 1. Native Reddit (Orange Pill) */
-  .theme-native { 
-    background: linear-gradient(135deg, #FF4500 0%, #FF8C00 100%) !important; 
-    color: white !important; 
-    border: none !important; 
-    border-radius: 50px !important; 
-    box-shadow: 0 8px 16px rgba(255, 69, 0, 0.25) !important; 
-  }
-  .theme-native:hover { 
-    transform: translateY(-3px) !important; 
-    box-shadow: 0 12px 20px rgba(255, 69, 0, 0.35) !important; 
-  }
+  .theme-native { background: linear-gradient(135deg, #FF4500 0%, #FF8C00 100%) !important; color: white !important; border: none !important; border-radius: 50px !important; box-shadow: 0 8px 16px rgba(255, 69, 0, 0.25) !important; }
+  .theme-native:hover { transform: translateY(-3px) !important; box-shadow: 0 12px 20px rgba(255, 69, 0, 0.35) !important; }
 
-  /* 2. Premium Black (No emojis, white text on black) */
-  .theme-premium {
-    background-color: #0F0F0F !important;
-    color: #FFFFFF !important;
-    border: 1px solid rgba(255,255,255,0.1) !important;
-    border-radius: 8px !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
-    letter-spacing: 0.3px !important;
-  }
-  .theme-premium:hover {
-    background-color: #202020 !important;
-    transform: translateY(-2px) !important;
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4) !important;
-  }
+  .theme-premium { background-color: #0F0F0F !important; color: #FFFFFF !important; border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 8px !important; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important; letter-spacing: 0.3px !important; }
+  .theme-premium:hover { background-color: #202020 !important; transform: translateY(-2px) !important; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4) !important; }
 
-  /* 3. Modern Blue (Google/Twitter style) */
-  .theme-modern { 
-    background-color: #1A73E8 !important; 
-    color: #FFFFFF !important; 
-    border: none !important; 
-    border-radius: 8px !important; 
-    box-shadow: 0 4px 12px rgba(26, 115, 232, 0.3) !important;
-  }
-  .theme-modern:hover { 
-    background-color: #1557B0 !important; 
-    transform: translateY(-2px) !important;
-    box-shadow: 0 6px 16px rgba(26, 115, 232, 0.4) !important;
-  }
+  .theme-modern { background-color: #1A73E8 !important; color: #FFFFFF !important; border: none !important; border-radius: 8px !important; box-shadow: 0 4px 12px rgba(26, 115, 232, 0.3) !important; }
+  .theme-modern:hover { background-color: #1557B0 !important; transform: translateY(-2px) !important; box-shadow: 0 6px 16px rgba(26, 115, 232, 0.4) !important; }
 
-  /* 4. Minimal Light (Clean white with outline) */
-  .theme-minimal { 
-    background-color: #FFFFFF !important; 
-    color: #3C4043 !important; 
-    border: 1px solid #DADCE0 !important; 
-    border-radius: 8px !important; 
-    box-shadow: 0 2px 6px rgba(0,0,0,0.05) !important;
-  }
-  .theme-minimal:hover { 
-    background-color: #F8F9FA !important;
-    color: #202124 !important;
-    border-color: #BDC1C6 !important;
-    transform: translateY(-2px) !important;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.1) !important;
-  }
+  .theme-minimal { background-color: #FFFFFF !important; color: #3C4043 !important; border: 1px solid #DADCE0 !important; border-radius: 8px !important; box-shadow: 0 2px 6px rgba(0,0,0,0.05) !important; }
+  .theme-minimal:hover { background-color: #F8F9FA !important; color: #202124 !important; border-color: #BDC1C6 !important; transform: translateY(-2px) !important; box-shadow: 0 4px 10px rgba(0,0,0,0.1) !important; }
 `;
 
 const styleSheet = document.createElement("style");
@@ -80,9 +34,7 @@ styleSheet.innerText = themeStyles;
 document.head.appendChild(styleSheet);
 
 function getButtonContent(themeName) {
-    if (themeName === 'theme-premium') {
-        return `<span>Download</span>`;
-    }
+    if (themeName === 'theme-premium') return `<span>Download</span>`;
     return `<span style="font-size: 18px;">🚀</span><span>Download Gallery</span>`;
 }
 
@@ -102,7 +54,7 @@ function getFailText(themeName) {
 }
 
 // --- CUSTOM TITLE PROMPT UI ---
-function promptForCustomTitle(defaultTitle, callback) {
+function promptForCustomTitle(defaultTitle, sepChar, callback) {
     const overlay = document.createElement('div');
     overlay.style.cssText = `
         position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
@@ -123,7 +75,7 @@ function promptForCustomTitle(defaultTitle, callback) {
     header.style.cssText = "margin: 0; color: #ffffff; font-size: 18px; font-weight: 600;";
 
     const desc = document.createElement('p');
-    desc.textContent = "Hit enter to use this formatted default, or type a new name to override it.";
+    desc.textContent = "Type a new name to override. Your word separators will be applied automatically.";
     desc.style.cssText = "margin: 0; color: #9aa0a6; font-size: 13px; line-height: 1.4;";
 
     const input = document.createElement('input');
@@ -137,11 +89,12 @@ function promptForCustomTitle(defaultTitle, callback) {
     input.addEventListener('focus', () => input.style.borderColor = '#8ab4f8');
     input.addEventListener('blur', () => input.style.borderColor = '#444444');
 
-    // FIX: BLOCKS REDDIT KEYBOARD SHORTCUTS FROM INTERFERING WITH TYPING
+    // FIX: SHIELD AGAINST REDDIT KEYBOARD HIJACKING
     ['keydown', 'keyup', 'keypress'].forEach(evt => {
         input.addEventListener(evt, (e) => {
             e.stopPropagation();
-        });
+            e.stopImmediatePropagation();
+        }, true);
     });
 
     const btnRow = document.createElement('div');
@@ -176,9 +129,11 @@ function promptForCustomTitle(defaultTitle, callback) {
     });
 
     const triggerDownload = () => {
-        const finalTitle = input.value.trim() || "Untitled_Gallery";
+        let typedTitle = input.value.trim() || "Untitled_Gallery";
+        let finalFormattedTitle = typedTitle.replace(/[\\/:*?"<>|]/g, "").split(/\s+/).join(sepChar);
+        
         overlay.remove();
-        callback(finalTitle); 
+        callback(finalFormattedTitle); 
     };
 
     const cancelDownload = () => overlay.remove(); 
@@ -189,7 +144,7 @@ function promptForCustomTitle(defaultTitle, callback) {
     input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') triggerDownload();
         if (e.key === 'Escape') cancelDownload();
-    });
+    }, false);
 }
 
 // --- MAIN BUTTON LOGIC ---
@@ -269,18 +224,17 @@ function manageFloatingButton() {
             });
         };
 
-        // Check user settings for the Prompt Toggle and Separator
         chrome.storage.sync.get('globalPrefs', (data) => {
             const prefs = data.globalPrefs || {};
             const isPromptEnabled = prefs.promptCustomTitle || false;
             
-            // Apply the user's custom Word Separator to the raw Reddit Title
             let sepFormat = prefs.separatorFormat || 'underscore';
             let sepChar = sepFormat === 'dash' ? '-' : sepFormat === 'space' ? ' ' : sepFormat === 'none' ? '' : '_';
+            
             let formattedCleanTitle = rawTitle.replace(/[\\/:*?"<>|]/g, "").substring(0, 45).trim().split(/\s+/).join(sepChar);
             
             if (isPromptEnabled) {
-                promptForCustomTitle(formattedCleanTitle, (newCustomTitle) => {
+                promptForCustomTitle(formattedCleanTitle, sepChar, (newCustomTitle) => {
                     executeDownload(newCustomTitle);
                 });
             } else {

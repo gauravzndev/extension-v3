@@ -1,14 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
     const toolbox = document.getElementById('toolbox');
     const dropzones = {
-        folder: {
-            folder: document.getElementById('dropzone-folder-folder'),
-            image: document.getElementById('dropzone-folder-image')
-        },
-        zip: {
-            archive: document.getElementById('dropzone-zip-archive'),
-            image: document.getElementById('dropzone-zip-image')
-        },
+        folder: { folder: document.getElementById('dropzone-folder-folder'), image: document.getElementById('dropzone-folder-image') },
+        zip: { archive: document.getElementById('dropzone-zip-archive'), image: document.getElementById('dropzone-zip-image') },
         individual: document.getElementById('dropzone-individual')
     };
 
@@ -26,8 +20,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const dateFormatSelect = document.getElementById('date-format-select');
     const timeFormatSelect = document.getElementById('time-format-select');
     const idFormatSelect = document.getElementById('id-format-select');
-    
-    // NEW: The Toggle Switch Element
     const promptTitleToggle = document.getElementById('prompt-title-toggle');
 
     const fallbacks = {
@@ -39,6 +31,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let uniqueStaticTextId = 0;
     let toastTimeout;
 
+    // Generates a static Base 36 hash (lowercase + digits) for the preview when empty.
+    const emptyFallbackHash = Math.random().toString(36).substring(2, 10);
+
     function showToast(message) {
         toast.textContent = message;
         toast.classList.add('show');
@@ -46,11 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
         toastTimeout = setTimeout(() => { toast.classList.remove('show'); }, 4000);
     }
 
-    new Sortable(toolbox, {
-        group: { name: 'shared', pull: 'clone', put: false },
-        animation: 150,
-        sort: false
-    });
+    new Sortable(toolbox, { group: { name: 'shared', pull: 'clone', put: false }, animation: 150, sort: false });
 
     const makeSortable = (el) => {
         new Sortable(el, { group: 'shared', animation: 150, onAdd: updatePreview, onUpdate: updatePreview, onRemove: updatePreview });
@@ -62,64 +53,67 @@ document.addEventListener('DOMContentLoaded', () => {
     makeSortable(dropzones.zip.image);
     makeSortable(dropzones.individual);
 
+    // --- REBUILT STATIC TEXT LOGIC ---
     addStaticTextBtn.addEventListener('click', () => {
-        const newPillId = `static-text-${uniqueStaticTextId++}`;
-        const newPill = document.createElement('div');
-        newPill.className = 'pill user-typed-text';
-        newPill.setAttribute('data-type', 'user_text');
-        newPill.setAttribute('data-static-text-id', newPillId);
-        newPill.textContent = '[Type Text...]';
+        addStaticTextBtn.style.display = 'none'; 
+
+        const inputWrapper = document.createElement('div');
+        inputWrapper.className = 'pill user-typed-text';
         
-        toolbox.appendChild(newPill);
-        makePillEditable(newPill);
-    });
-
-    const makePillEditable = (pillEl) => {
-        pillEl.addEventListener('dblclick', (e) => {
-            if (e.target === pillEl) convertToInput(pillEl);
-        });
-    };
-
-    const convertToInput = (pillEl) => {
-        const currentText = pillEl.textContent.replace(/^\[|\]$/g, '');
         const input = document.createElement('input');
         input.type = 'text';
         input.className = 'pill-input';
-        input.value = currentText === 'Type Text...' ? '' : currentText;
+        input.placeholder = 'Type...';
+        input.style.width = '8ch';
         
-        const updateWidth = () => { input.style.width = Math.max(input.value.length + 1, 5) + 'ch'; };
-        updateWidth();
+        inputWrapper.appendChild(input);
+        toolbox.insertBefore(inputWrapper, addStaticTextBtn);
         
-        pillEl.textContent = ''; 
-        pillEl.appendChild(input);
+        input.focus();
 
-        requestAnimationFrame(() => {
-            input.focus();
-            input.setSelectionRange(input.value.length, input.value.length);
-        });
-        
-        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveInput(pillEl, input); });
-        input.addEventListener('blur', () => saveInput(pillEl, input));
+        const updateWidth = () => { input.style.width = Math.max(input.value.length + 1, 8) + 'ch'; };
         input.addEventListener('input', updateWidth);
+
+        let saved = false;
+        const finalizePill = () => {
+            if (saved) return;
+            saved = true;
+
+            let rawText = input.value.trim();
+            if (!rawText) {
+                inputWrapper.remove(); 
+                addStaticTextBtn.style.display = 'block';
+                return;
+            }
+            
+            let sanitizedText = rawText.replace(/[<>:"/\\|?*]/g, '-');
+            if (rawText !== sanitizedText) showToast("Special characters were replaced with '-'");
+            
+            inputWrapper.innerHTML = '';
+            inputWrapper.textContent = `[${sanitizedText}]`;
+            inputWrapper.setAttribute('data-type', 'user_text');
+            inputWrapper.setAttribute('data-generated-text', sanitizedText);
+            inputWrapper.setAttribute('data-static-text-id', `static-text-${uniqueStaticTextId++}`);
+            
+            makePillDeletable(inputWrapper);
+            
+            addStaticTextBtn.style.display = 'block';
+            updatePreview();
+        };
+
+        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') finalizePill(); });
+        input.addEventListener('blur', finalizePill);
+    });
+
+    const makePillDeletable = (pillEl) => {
+        pillEl.title = "Double-click to delete";
+        pillEl.addEventListener('dblclick', (e) => {
+            if (pillEl.parentElement === toolbox) {
+                pillEl.remove();
+                updatePreview();
+            }
+        });
     };
-
-    const saveInput = (pillEl, inputEl) => {
-        if (!pillEl.contains(inputEl)) return;
-
-        let rawText = inputEl.value.trim() || 'Custom';
-        let sanitizedText = rawText.replace(/[<>:"/\\|?*]/g, '-');
-        
-        if (rawText !== sanitizedText) {
-            showToast("Special characters were replaced with '-' to prevent folder errors.");
-        }
-        
-        pillEl.removeChild(inputEl);
-        pillEl.textContent = `[${sanitizedText}]`; 
-        pillEl.setAttribute('data-generated-text', sanitizedText); 
-        updatePreview();
-    }; 
-
-    toolbox.querySelectorAll('.pill.user-typed-text').forEach(pill => makePillEditable(pill));
 
     const activeZoneList = [dropzones.folder.folder, dropzones.folder.image, dropzones.zip.archive, dropzones.zip.image, dropzones.individual];
     activeZoneList.forEach(zone => {
@@ -175,7 +169,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const getFormulaString = (dropzone, data) => {
         const pills = dropzone.querySelectorAll('.pill');
-        if (pills.length === 0) return 'unnamed';
+        
+        // Base 36 hash fallback
+        if (pills.length === 0) return emptyFallbackHash; 
         
         let formulaString = '';
         pills.forEach((pill, index) => {
@@ -240,7 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
             dateFormat: dateFormatSelect.value,
             timeFormat: timeFormatSelect.value,
             idFormat: idFormatSelect.value,
-            promptCustomTitle: promptTitleToggle.checked // NEW: Captures the toggle state
+            promptCustomTitle: promptTitleToggle.checked 
         };
 
         const saveZoneState = (dropzone) => Array.from(dropzone.querySelectorAll('.pill')).map(pillToState);
@@ -295,7 +291,6 @@ document.addEventListener('DOMContentLoaded', () => {
         let data = allData;
         
         if (!data || Object.keys(data).length === 0 || !data.globalPrefs || !data.modeState || !data.modeState.folder) {
-            console.warn("Legacy data detected. Wiping and loading defaults to prevent crash.");
             data = defaultState;
             chrome.storage.sync.clear();
             chrome.storage.sync.set(defaultState);
@@ -305,14 +300,14 @@ document.addEventListener('DOMContentLoaded', () => {
         dateFormatSelect.value = data.globalPrefs.dateFormat;
         timeFormatSelect.value = data.globalPrefs.timeFormat;
         idFormatSelect.value = data.globalPrefs.idFormat;
-        promptTitleToggle.checked = data.globalPrefs.promptCustomTitle || false; // NEW: Loads the toggle state
+        promptTitleToggle.checked = data.globalPrefs.promptCustomTitle || false; 
         uniqueStaticTextId = data.lastUniqueStaticTextId || 0;
 
         if (data.toolboxStaticTextDefs) {
             data.toolboxStaticTextDefs.forEach(pillState => {
                 const pill = stateToPill(pillState);
-                makePillEditable(pill);
-                toolbox.appendChild(pill);
+                makePillDeletable(pill); 
+                toolbox.insertBefore(pill, addStaticTextBtn);
             });
         }
 
@@ -320,14 +315,13 @@ document.addEventListener('DOMContentLoaded', () => {
             zoneEl.innerHTML = ''; 
             pillStates.forEach(pillState => {
                 const pill = stateToPill(pillState);
-                if (pillState.type === 'user_text') makePillEditable(pill);
                 zoneEl.appendChild(pill);
             });
         };
 
         const loadFallbacks = (fallbackGroup, fallbackStates) => {
-            if (fallbackGroup.truncate) fallbackGroup.truncate.value = fallbackStates.truncate;
-            if (fallbackGroup.missingTitle) fallbackGroup.missingTitle.value = fallbackStates.missingTitle;
+            if (fallbackGroup.truncate) fallbackGroup.truncate.value = fallbackStates.truncate || 'auto';
+            if (fallbackGroup.missingTitle) fallbackGroup.missingTitle.value = fallbackStates.missingTitle || 'placeholder';
         };
 
         loadZoneState(dropzones.folder.folder, data.modeState.folder.folder);
