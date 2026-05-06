@@ -18,7 +18,6 @@
             --primary-soft: rgba(26, 115, 232, 0.08);
             --success: #10b981;
             --success-soft: rgba(16, 185, 129, 0.12);
-            --reddit: #ff4500;
             --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
             --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06);
         }
@@ -61,15 +60,15 @@
         }
 
         .header-icon {
-            width: 36px;
-            height: 36px;
-            border-radius: 9px;
-            background: linear-gradient(135deg, #FF4500 0%, #FF8C00 100%);
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: var(--bg-elev);
+            border: 1px solid var(--border);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 18px;
-            box-shadow: var(--shadow-sm);
+            font-size: 16px;
         }
 
         .header-text h1 {
@@ -341,17 +340,9 @@
         .preview-btn[data-size="normal"]  { padding: 12px 24px; font-size: 14px; }
         .preview-btn[data-size="large"]   { padding: 16px 32px; font-size: 16px; }
 
-        .preview-btn[data-theme="theme-native"] { background: linear-gradient(135deg, #FF4500 0%, #FF8C00 100%); color: white; border-radius: 50px; box-shadow: 0 6px 14px rgba(255, 69, 0, 0.25); }
-        .preview-btn[data-theme="theme-premium"] { background-color: #0F0F0F; color: #FFFFFF; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); }
-        .preview-btn[data-theme="theme-modern"] { background-color: #1A73E8; color: #FFFFFF; border-radius: 8px; box-shadow: 0 4px 12px rgba(26, 115, 232, 0.3); }
-        .preview-btn[data-theme="theme-minimal"] { background-color: #FFFFFF; color: #3C4043; border: 1px solid #DADCE0; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
-        .preview-btn[data-theme="theme-glass"] { background: rgba(120,120,140,0.25); backdrop-filter: blur(14px); color: #ffffff; border: 1px solid rgba(255,255,255,0.25); border-radius: 12px; box-shadow: 0 6px 20px rgba(0,0,0,0.18); }
-        .preview-btn[data-theme="theme-gradient"] { background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%); color: #ffffff; border-radius: 12px; box-shadow: 0 8px 20px rgba(118, 75, 162, 0.4); }
-        .preview-btn[data-theme="theme-neon"] { background-color: #0a0a0a; color: #00ffd1; border: 1px solid #00ffd1; border-radius: 6px; box-shadow: 0 0 12px rgba(0, 255, 209, 0.5); text-shadow: 0 0 6px rgba(0, 255, 209, 0.7); letter-spacing: 0.5px; }
-        .preview-btn[data-theme="theme-soft"] { background-color: #f0f0f3; color: #2d3748; border-radius: 16px; box-shadow: 4px 4px 8px rgba(174, 174, 192, 0.5), -4px -4px 8px rgba(255, 255, 255, 0.95); }
-        .preview-btn[data-theme="theme-mint"] { background-color: #10B981; color: #FFFFFF; border-radius: 50px; box-shadow: 0 5px 14px rgba(16, 185, 129, 0.35); }
-        .preview-btn[data-theme="theme-sunset"] { background: linear-gradient(135deg, #FF6B6B 0%, #FFD93D 100%); color: #2d1810; border-radius: 50px; box-shadow: 0 5px 14px rgba(255, 107, 107, 0.35); }
-        .preview-btn[data-theme="theme-mono"] { background-color: transparent; color: var(--text-primary); border: 1.5px solid var(--text-primary); border-radius: 6px; }
+        /* Per-theme styles for .preview-btn are injected by popup.js at startup
+           via buildThemeStyles() in themes.js. Single source of truth shared
+           with content.js. */
     </style>
 </head>
 
@@ -361,7 +352,7 @@
         <div class="header-icon">📥</div>
         <div class="header-text">
             <h1>Reddit Gallery Downloader</h1>
-            <p>Quick settings · v2.2</p>
+            <p>Quick settings · <span id="popupVersion"></span></p>
         </div>
     </div>
 
@@ -388,8 +379,8 @@
             <h2 class="section-title">Button Appearance</h2>
             <div class="field">
                 <label for="customButtonLabel">Custom Button Label <span style="font-weight: 400; color: var(--text-tertiary); font-size: 11px;">(optional)</span></label>
-                <input type="text" id="customButtonLabel" placeholder="Download Gallery" maxlength="40" />
-                <div class="helper-text">Leave blank to use the default. Some themes show a shorter label by default.</div>
+                <input type="text" id="customButtonLabel" placeholder="🚀 Download Gallery" maxlength="40" />
+                <div class="helper-text">Leave blank for the default <strong>🚀 Download Gallery</strong>. Anything you type here is shown exactly as-is — include an emoji if you want one.</div>
             </div>
             <div class="field">
                 <label for="buttonTheme">Style</label>
@@ -457,6 +448,7 @@
 
         <div id="status"></div>
     </div>
+    <script src="themes.js"></script>
     <script src="popup.js"></script>
 </body>
 

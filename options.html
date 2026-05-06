@@ -57,10 +57,9 @@
             <div class="header-row">
                 <div>
                     <h1>Configure File Naming</h1>
-                    <p>Build custom naming conventions. Drag elements into the formula. Double-click any pill to remove it.</p>
+                    <p>Decide exactly what your downloaded files and folders are called. Drag the coloured pills below into a formula, rearrange them, and double-click any pill to remove it. The live preview updates as you build, so you can see the final filename before saving.</p>
                 </div>
                 <div class="save-wrapper">
-                    <span id="status-msg"></span>
                     <button id="save-configuration-btn" class="action-btn" type="button">
                         <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="20 6 9 17 4 12"></polyline>
@@ -76,7 +75,7 @@
                 <div class="toggle-group">
                     <div class="toggle-text">
                         <label class="toggle-title">Prompt for Custom Title before downloading</label>
-                        <span class="toggle-desc">Pops up a quick input box when you hit download. It pre-fills with your formatted defaults, but if you type something new, it completely overrides the name for that specific gallery.</span>
+                        <span class="toggle-desc">Opens your browser's built-in prompt every time you click Download, pre-filled with the post's title so you can keep it as-is by pressing Enter, or type a new name to override the title for that one gallery only. The rest of your formula (subreddit, index, date, etc.) is still applied around it. Leave this off to download silently using the post's real title.</span>
                     </div>
                     <label class="switch">
                         <input type="checkbox" id="prompt-title-toggle">
@@ -85,18 +84,8 @@
                 </div>
                 <div class="toggle-group" style="margin-top: 16px;">
                     <div class="toggle-text">
-                        <label class="toggle-title">Use enhanced prompt box (recommended)</label>
-                        <span class="toggle-desc">Shows a custom prompt right above the Download button instead of the native browser dialog at the top of the screen. Reddit's keyboard shortcuts are blocked while you type.</span>
-                    </div>
-                    <label class="switch">
-                        <input type="checkbox" id="custom-modal-toggle" checked>
-                        <span class="slider round"></span>
-                    </label>
-                </div>
-                <div class="toggle-group" style="margin-top: 16px;">
-                    <div class="toggle-text">
                         <label class="toggle-title">Enable Alt + D keyboard shortcut</label>
-                        <span class="toggle-desc">Press <strong>Alt + D</strong> on a Reddit gallery page to trigger the download without clicking. The shortcut is ignored while you're typing in any input or text field. If your browser intercepts Alt + D for the address bar, turn this off.</span>
+                        <span class="toggle-desc">Press <strong>Alt + D</strong> on any Reddit gallery page to start the download without reaching for the mouse. The shortcut stays out of the way while you're typing in comment boxes or search fields. If your browser uses Alt + D to focus the address bar, turn this off to avoid the conflict.</span>
                     </div>
                     <label class="switch">
                         <input type="checkbox" id="keyboard-shortcut-toggle" checked>
@@ -111,6 +100,7 @@
                 <button class="tab-link" data-mode="zip">ZIP Mode</button>
                 <button class="tab-link" data-mode="individual">Individual Mode</button>
             </div>
+            <p class="section-helper" style="margin-top:-12px;">Pick how a gallery lands on your disk. <strong>Folder</strong> creates a sub-folder per gallery and drops the images inside. <strong>ZIP</strong> bundles the whole gallery into a single archive. <strong>Individual</strong> saves the images straight into your base downloads folder with no wrapper. Each mode has its own naming formula below — switch tabs to configure them.</p>
 
             <!-- Unified Variable Toolbox -->
             <div class="section">
@@ -161,10 +151,10 @@
                         <div class="rule-group">
                             <label>If Title is missing<span class="info-icon" data-tooltip="Posts without a real title (or that look like default Reddit boilerplate) trigger this rule. Choose a placeholder string or omit the Title pill entirely from the name.">?</span></label>
                             <select id="missing-title-rule-folder">
-                                <option value="placeholder">Use a placeholder</option>
                                 <option value="omit">Omit title from name</option>
+                                <option value="placeholder">Use a placeholder</option>
                             </select>
-                            <input type="text" id="placeholder-text-folder" class="placeholder-input" placeholder="e.g., Gallery_no_title" maxlength="80" />
+                            <input type="text" id="placeholder-text-folder" class="placeholder-input" placeholder="No Title (default if blank)" maxlength="80" />
                         </div>
                         <div class="rule-group">
                             <label>For single-image galleries<span class="info-icon" data-tooltip="When a post has just one image, the Index pill is normally hidden. Choose 'Always add index' if you want '01' on single-image galleries too.">?</span></label>
@@ -205,10 +195,10 @@
                         <div class="rule-group">
                             <label>If Title is missing<span class="info-icon" data-tooltip="Posts without a real title (or that look like default Reddit boilerplate) trigger this rule. Choose a placeholder string or omit the Title pill entirely from the name.">?</span></label>
                             <select id="missing-title-rule-zip">
-                                <option value="placeholder">Use a placeholder</option>
                                 <option value="omit">Omit title from name</option>
+                                <option value="placeholder">Use a placeholder</option>
                             </select>
-                            <input type="text" id="placeholder-text-zip" class="placeholder-input" placeholder="e.g., Gallery_no_title" maxlength="80" />
+                            <input type="text" id="placeholder-text-zip" class="placeholder-input" placeholder="No Title (default if blank)" maxlength="80" />
                         </div>
                         <div class="rule-group">
                             <label>For single-image galleries<span class="info-icon" data-tooltip="When a post has just one image, the Index pill is normally hidden. Choose 'Always add index' if you want '01' on single-image galleries too.">?</span></label>
@@ -245,10 +235,10 @@
                         <div class="rule-group">
                             <label>If Title is missing<span class="info-icon" data-tooltip="Posts without a real title (or that look like default Reddit boilerplate) trigger this rule. Choose a placeholder string or omit the Title pill entirely from the name.">?</span></label>
                             <select id="missing-title-rule-individual">
-                                <option value="placeholder">Use a placeholder</option>
                                 <option value="omit">Omit title from name</option>
+                                <option value="placeholder">Use a placeholder</option>
                             </select>
-                            <input type="text" id="placeholder-text-individual" class="placeholder-input" placeholder="e.g., Gallery_no_title" maxlength="80" />
+                            <input type="text" id="placeholder-text-individual" class="placeholder-input" placeholder="No Title (default if blank)" maxlength="80" />
                         </div>
                         <div class="rule-group">
                             <label>For single-image galleries<span class="info-icon" data-tooltip="When a post has just one image, the Index pill is normally hidden. Choose 'Always add index' if you want '01' on single-image galleries too.">?</span></label>
@@ -299,7 +289,6 @@
                         <select id="title-space-select">
                             <option value="default">Match Element Separator</option>
                             <option value="keep">Keep spaces in title</option>
-                            <option value="space">Space (   )</option>
                             <option value="underscore">Underscore ( _ )</option>
                             <option value="dash">Dash ( - )</option>
                             <option value="none">None (Merged)</option>
@@ -314,13 +303,13 @@
                         </select>
                     </div>
                     <div class="setting-group">
-                        <label>Date Format</label>
+                        <label>Date Format<span class="info-icon" data-tooltip="Order of year, month, and day. The character between them is set by the Date Separator dropdown below.">?</span></label>
                         <select id="date-format-select">
-                            <option value="yyyy-mm-dd">YYYY MM DD</option>
-                            <option value="dd-mm-yyyy">DD MM YYYY</option>
-                            <option value="dd-mm-yy">DD MM YY</option>
-                            <option value="mm-dd-yyyy">MM DD YYYY</option>
-                            <option value="mm-dd-yy">MM DD YY</option>
+                            <option value="yyyy-mm-dd">Year, Month, Day</option>
+                            <option value="dd-mm-yyyy">Day, Month, Year</option>
+                            <option value="dd-mm-yy">Day, Month, Year (2-digit year)</option>
+                            <option value="mm-dd-yyyy">Month, Day, Year</option>
+                            <option value="mm-dd-yy">Month, Day, Year (2-digit year)</option>
                         </select>
                     </div>
                     <div class="setting-group">
@@ -334,10 +323,10 @@
                         </select>
                     </div>
                     <div class="setting-group">
-                        <label>Time Format</label>
+                        <label>Time Format<span class="info-icon" data-tooltip="The character between hour, minute, and second comes from the Element Separation Character above. AM/PM is appended for 12-hour mode.">?</span></label>
                         <select id="time-format-select">
-                            <option value="24h">24-Hour (14:30:00)</option>
-                            <option value="12h">12-Hour (02:30 PM)</option>
+                            <option value="24h">24-hour clock</option>
+                            <option value="12h">12-hour clock with AM/PM</option>
                         </select>
                     </div>
                     <div class="setting-group">

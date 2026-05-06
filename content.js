@@ -1,7 +1,8 @@
 const MAX_SAFE_LENGTH = 110;
 
-const themeStyles = `
-  /* Base Structure */
+// Base layout. The 11 theme variants live in themes.js (loaded ahead of us
+// via manifest.json) so the popup's live preview pulls from the same source.
+const baseStyles = `
   .reddit-gallery-dl-btn {
     position: fixed !important;
     z-index: 2147483647 !important;
@@ -14,119 +15,18 @@ const themeStyles = `
     font-weight: 600 !important;
   }
 
-  /* Position variants */
   .reddit-gallery-dl-btn[data-pos="bottom-right"] { bottom: 30px !important; right: 30px !important; top: auto !important; left: auto !important; }
   .reddit-gallery-dl-btn[data-pos="bottom-left"]  { bottom: 30px !important; left: 30px !important; top: auto !important; right: auto !important; }
   .reddit-gallery-dl-btn[data-pos="top-right"]    { top: 80px !important; right: 30px !important; bottom: auto !important; left: auto !important; }
   .reddit-gallery-dl-btn[data-pos="top-left"]     { top: 80px !important; left: 30px !important; bottom: auto !important; right: auto !important; }
 
-  /* Size variants */
   .reddit-gallery-dl-btn[data-size="compact"] { padding: 8px 16px !important; font-size: 13px !important; }
   .reddit-gallery-dl-btn[data-size="normal"]  { padding: 14px 28px !important; font-size: 15px !important; }
   .reddit-gallery-dl-btn[data-size="large"]   { padding: 18px 36px !important; font-size: 17px !important; }
-
-  /* Theme variants */
-  .reddit-gallery-dl-btn[data-theme="theme-native"] { background: linear-gradient(135deg, #FF4500 0%, #FF8C00 100%) !important; color: white !important; border: none !important; border-radius: 50px !important; box-shadow: 0 8px 16px rgba(255, 69, 0, 0.25) !important; }
-  .reddit-gallery-dl-btn[data-theme="theme-native"]:hover { transform: translateY(-3px) !important; box-shadow: 0 12px 20px rgba(255, 69, 0, 0.35) !important; }
-
-  .reddit-gallery-dl-btn[data-theme="theme-premium"] { background-color: #0F0F0F !important; color: #FFFFFF !important; border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 8px !important; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important; letter-spacing: 0.3px !important; }
-  .reddit-gallery-dl-btn[data-theme="theme-premium"]:hover { background-color: #202020 !important; transform: translateY(-2px) !important; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4) !important; }
-
-  .reddit-gallery-dl-btn[data-theme="theme-modern"] { background-color: #1A73E8 !important; color: #FFFFFF !important; border: none !important; border-radius: 8px !important; box-shadow: 0 4px 12px rgba(26, 115, 232, 0.3) !important; }
-  .reddit-gallery-dl-btn[data-theme="theme-modern"]:hover { background-color: #1557B0 !important; transform: translateY(-2px) !important; box-shadow: 0 6px 16px rgba(26, 115, 232, 0.4) !important; }
-
-  .reddit-gallery-dl-btn[data-theme="theme-minimal"] { background-color: #FFFFFF !important; color: #3C4043 !important; border: 1px solid #DADCE0 !important; border-radius: 8px !important; box-shadow: 0 2px 6px rgba(0,0,0,0.05) !important; }
-  .reddit-gallery-dl-btn[data-theme="theme-minimal"]:hover { background-color: #F8F9FA !important; color: #202124 !important; border-color: #BDC1C6 !important; transform: translateY(-2px) !important; box-shadow: 0 4px 10px rgba(0,0,0,0.1) !important; }
-
-  .reddit-gallery-dl-btn[data-theme="theme-glass"] { background: rgba(255,255,255,0.15) !important; backdrop-filter: blur(14px) saturate(180%) !important; -webkit-backdrop-filter: blur(14px) saturate(180%) !important; color: #ffffff !important; border: 1px solid rgba(255,255,255,0.25) !important; border-radius: 12px !important; box-shadow: 0 8px 32px rgba(0,0,0,0.2) !important; }
-  .reddit-gallery-dl-btn[data-theme="theme-glass"]:hover { background: rgba(255,255,255,0.22) !important; transform: translateY(-2px) !important; }
-
-  .reddit-gallery-dl-btn[data-theme="theme-gradient"] { background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%) !important; color: #ffffff !important; border: none !important; border-radius: 12px !important; box-shadow: 0 8px 24px rgba(118, 75, 162, 0.4) !important; }
-  .reddit-gallery-dl-btn[data-theme="theme-gradient"]:hover { transform: translateY(-3px) !important; box-shadow: 0 12px 32px rgba(118, 75, 162, 0.5) !important; }
-
-  .reddit-gallery-dl-btn[data-theme="theme-neon"] { background-color: #0a0a0a !important; color: #00ffd1 !important; border: 1px solid #00ffd1 !important; border-radius: 6px !important; box-shadow: 0 0 12px rgba(0, 255, 209, 0.5), inset 0 0 8px rgba(0, 255, 209, 0.1) !important; text-shadow: 0 0 6px rgba(0, 255, 209, 0.7) !important; letter-spacing: 0.5px !important; }
-  .reddit-gallery-dl-btn[data-theme="theme-neon"]:hover { box-shadow: 0 0 18px rgba(0, 255, 209, 0.7), inset 0 0 12px rgba(0, 255, 209, 0.15) !important; transform: translateY(-2px) !important; }
-
-  .reddit-gallery-dl-btn[data-theme="theme-soft"] { background-color: #f0f0f3 !important; color: #2d3748 !important; border: none !important; border-radius: 16px !important; box-shadow: 6px 6px 12px rgba(174, 174, 192, 0.5), -6px -6px 12px rgba(255, 255, 255, 0.95) !important; }
-  .reddit-gallery-dl-btn[data-theme="theme-soft"]:hover { box-shadow: inset 4px 4px 8px rgba(174, 174, 192, 0.4), inset -4px -4px 8px rgba(255,255,255,0.9) !important; }
-
-  .reddit-gallery-dl-btn[data-theme="theme-mint"] { background-color: #10B981 !important; color: #FFFFFF !important; border: none !important; border-radius: 50px !important; box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35) !important; }
-  .reddit-gallery-dl-btn[data-theme="theme-mint"]:hover { background-color: #059669 !important; transform: translateY(-2px) !important; }
-
-  .reddit-gallery-dl-btn[data-theme="theme-sunset"] { background: linear-gradient(135deg, #FF6B6B 0%, #FFD93D 100%) !important; color: #2d1810 !important; border: none !important; border-radius: 50px !important; box-shadow: 0 6px 18px rgba(255, 107, 107, 0.35) !important; }
-  .reddit-gallery-dl-btn[data-theme="theme-sunset"]:hover { transform: translateY(-2px) !important; box-shadow: 0 10px 24px rgba(255, 107, 107, 0.45) !important; }
-
-  .reddit-gallery-dl-btn[data-theme="theme-mono"] { background-color: transparent !important; color: currentColor !important; border: 1.5px solid currentColor !important; border-radius: 6px !important; box-shadow: none !important; }
-  .reddit-gallery-dl-btn[data-theme="theme-mono"]:hover { background-color: rgba(0,0,0,0.05) !important; }
-
-  /* Custom modal — sits near the button so users don't have to chase the top of the screen */
-  .rgd-modal-backdrop {
-    position: fixed !important;
-    inset: 0 !important;
-    background: rgba(0,0,0,0.45) !important;
-    z-index: 2147483646 !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-  }
-  .rgd-modal {
-    position: fixed !important;
-    z-index: 2147483647 !important;
-    background: #ffffff !important;
-    color: #111827 !important;
-    border-radius: 12px !important;
-    padding: 20px 22px !important;
-    width: 380px !important;
-    max-width: calc(100vw - 40px) !important;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.35) !important;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
-    box-sizing: border-box !important;
-  }
-  @media (prefers-color-scheme: dark) {
-    .rgd-modal { background: #1f2937 !important; color: #f9fafb !important; }
-  }
-  .rgd-modal h3 { margin: 0 0 6px 0 !important; font-size: 14px !important; font-weight: 500 !important; opacity: 0.7 !important; }
-  .rgd-modal .rgd-default {
-    background: rgba(128,128,128,0.12) !important;
-    padding: 10px 12px !important;
-    border-radius: 8px !important;
-    font-size: 13px !important;
-    margin-bottom: 14px !important;
-    word-break: break-word !important;
-    border-left: 3px solid #1A73E8 !important;
-  }
-  .rgd-modal label { display: block !important; font-size: 13px !important; margin-bottom: 6px !important; font-weight: 500 !important; }
-  .rgd-modal .rgd-helper { font-size: 11px !important; opacity: 0.65 !important; margin-top: 4px !important; }
-  .rgd-modal input[type="text"] {
-    width: 100% !important;
-    padding: 10px 12px !important;
-    border: 1px solid rgba(128,128,128,0.35) !important;
-    border-radius: 8px !important;
-    font-size: 14px !important;
-    box-sizing: border-box !important;
-    background: transparent !important;
-    color: inherit !important;
-    font-family: inherit !important;
-  }
-  .rgd-modal input[type="text"]:focus { outline: 2px solid #1A73E8 !important; outline-offset: -1px !important; }
-  .rgd-modal-actions { display: flex !important; gap: 8px !important; justify-content: flex-end !important; margin-top: 16px !important; }
-  .rgd-modal button {
-    padding: 8px 16px !important;
-    border-radius: 6px !important;
-    font-size: 13px !important;
-    font-weight: 600 !important;
-    cursor: pointer !important;
-    border: none !important;
-    font-family: inherit !important;
-  }
-  .rgd-btn-primary { background: #1A73E8 !important; color: #ffffff !important; }
-  .rgd-btn-primary:hover { background: #1557B0 !important; }
-  .rgd-btn-secondary { background: transparent !important; border: 1px solid rgba(128,128,128,0.4) !important; color: inherit !important; }
-  .rgd-btn-secondary:hover { background: rgba(128,128,128,0.12) !important; }
 `;
 
 const styleSheet = document.createElement("style");
-styleSheet.innerText = themeStyles;
+styleSheet.innerText = baseStyles + '\n' + buildThemeStyles('.reddit-gallery-dl-btn', { important: true });
 document.head.appendChild(styleSheet);
 
 const MINIMAL_LABEL_THEMES = new Set(['theme-premium', 'theme-mono', 'theme-neon']);
@@ -140,20 +40,13 @@ function escapeHtml(str) {
         .replace(/'/g, '&#039;');
 }
 
-function getButtonContent(themeName, customLabel) {
-    const isMinimal = MINIMAL_LABEL_THEMES.has(themeName);
-    if (customLabel) {
-        const safe = escapeHtml(customLabel);
-        if (isMinimal) return `<span>${safe}</span>`;
-        return `<span style="font-size: 18px;">🚀</span><span>${safe}</span>`;
-    }
-    if (isMinimal) return `<span>Download</span>`;
+function getButtonContent(customLabel) {
+    if (customLabel) return `<span>${escapeHtml(customLabel)}</span>`;
     return `<span style="font-size: 18px;">🚀</span><span>Download Gallery</span>`;
 }
 
-function getLoadingText(themeName) {
-    if (MINIMAL_LABEL_THEMES.has(themeName)) return "Fetching...";
-    return "⏳ Fetching...";
+function getLoadingText() {
+    return "Downloading...";
 }
 
 function getSuccessText(themeName, count, total) {
@@ -167,115 +60,16 @@ function getFailText(themeName) {
     return "❌ No Images";
 }
 
-// Custom in-page modal that sits anywhere we want and stops Reddit's hotkeys from
-// stealing keystrokes (capture-phase listeners + stopImmediatePropagation).
-function showTitleModal({ defaultTitle, anchorEl }, callback) {
-    const existing = document.getElementById('rgd-modal-root');
-    if (existing) existing.remove();
-
-    const root = document.createElement('div');
-    root.id = 'rgd-modal-root';
-
-    const backdrop = document.createElement('div');
-    backdrop.className = 'rgd-modal-backdrop';
-
-    const modal = document.createElement('div');
-    modal.className = 'rgd-modal';
-
-    modal.innerHTML = `
-        <h3>www.reddit.com says</h3>
-        <div class="rgd-default" id="rgd-default-title"></div>
-        <label>Enter a custom title for this gallery:</label>
-        <input type="text" id="rgd-title-input" autocomplete="off" spellcheck="false" />
-        <div class="rgd-helper">Press <strong>Enter</strong> to save, <strong>Esc</strong> to cancel. Use Ctrl+Arrows to jump words.</div>
-        <div class="rgd-modal-actions">
-            <button type="button" class="rgd-btn-secondary" id="rgd-cancel">Cancel</button>
-            <button type="button" class="rgd-btn-primary" id="rgd-confirm">Download</button>
-        </div>
-    `;
-
-    backdrop.appendChild(modal);
-    root.appendChild(backdrop);
-    document.body.appendChild(root);
-
-    const defaultBox = modal.querySelector('#rgd-default-title');
-    defaultBox.textContent = defaultTitle || '(no title detected)';
-
-    const input = modal.querySelector('#rgd-title-input');
-    input.value = defaultTitle || '';
-
-    // Position modal near the trigger button when possible.
-    if (anchorEl) {
-        const rect = anchorEl.getBoundingClientRect();
-        const modalWidth = 380;
-        const modalHeight = 220;
-
-        let left = rect.right - modalWidth;
-        if (left < 20) left = 20;
-        if (left + modalWidth > window.innerWidth - 20) left = window.innerWidth - modalWidth - 20;
-
-        let top = rect.top - modalHeight - 12;
-        if (top < 20) top = rect.bottom + 12;
-        if (top + modalHeight > window.innerHeight - 20) top = Math.max(20, window.innerHeight - modalHeight - 20);
-
-        modal.style.position = 'fixed';
-        modal.style.left = `${left}px`;
-        modal.style.top = `${top}px`;
-        modal.style.transform = 'none';
-        backdrop.style.alignItems = 'flex-start';
-        backdrop.style.justifyContent = 'flex-start';
-    }
-
-    // Block Reddit's site-wide keyboard shortcuts while the modal is open. We listen
-    // at window-level capture so we run before Reddit's listeners regardless of where
-    // they're bound. Only swallow events whose target is inside the modal.
-    const swallow = (e) => {
-        if (root.contains(e.target)) {
-            e.stopImmediatePropagation();
-        }
-    };
-    const swallowEvents = ['keydown', 'keypress', 'keyup'];
-    swallowEvents.forEach(evt => window.addEventListener(evt, swallow, true));
-
-    let resolved = false;
-    const cleanup = () => {
-        if (resolved) return;
-        resolved = true;
-        swallowEvents.forEach(evt => window.removeEventListener(evt, swallow, true));
-        root.remove();
-    };
-
-    const finish = (value) => {
-        cleanup();
-        if (value === null) return; // cancelled
-        let typed = (value || '').trim() || "Untitled_Gallery";
-        let cleaned = typed.replace(/[\\/:*?"<>|]/g, "");
-        callback(cleaned);
-    };
-
-    modal.querySelector('#rgd-confirm').addEventListener('click', () => finish(input.value));
-    modal.querySelector('#rgd-cancel').addEventListener('click', () => finish(null));
-    backdrop.addEventListener('click', (e) => { if (e.target === backdrop) finish(null); });
-
-    input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') { e.preventDefault(); finish(input.value); }
-        else if (e.key === 'Escape') { e.preventDefault(); finish(null); }
-    }, true);
-
-    setTimeout(() => { input.focus(); input.select(); }, 0);
-}
-
 let cachedSettings = null;
 
 function loadSettings(callback) {
-    chrome.storage.sync.get(['buttonTheme', 'buttonPosition', 'buttonSize', 'customButtonLabel', 'keyboardShortcutEnabled', 'globalPrefs', 'modeState', 'useCustomModal'], (s) => {
+    chrome.storage.sync.get(['buttonTheme', 'buttonPosition', 'buttonSize', 'customButtonLabel', 'keyboardShortcutEnabled', 'globalPrefs', 'modeState'], (s) => {
         cachedSettings = {
             theme: s.buttonTheme || 'theme-native',
             position: s.buttonPosition || 'bottom-right',
             size: s.buttonSize || 'normal',
             customLabel: (s.customButtonLabel || '').trim().slice(0, 40),
             keyboardShortcutEnabled: s.keyboardShortcutEnabled !== false,
-            useCustomModal: s.useCustomModal !== false,
             globalPrefs: s.globalPrefs || {},
             modeState: s.modeState || {}
         };
@@ -288,7 +82,11 @@ function applyButtonAppearance(btn, settings) {
     btn.setAttribute('data-theme', settings.theme);
     btn.setAttribute('data-pos', settings.position);
     btn.setAttribute('data-size', settings.size);
-    btn.innerHTML = getButtonContent(settings.theme, settings.customLabel);
+    // Don't trample the loading/done text if a download is currently running.
+    // The click handler resets the label itself when the cycle finishes.
+    if (btn.dataset.busy !== 'true') {
+        btn.innerHTML = getButtonContent(settings.customLabel);
+    }
 }
 
 function isPostPage() {
@@ -304,10 +102,18 @@ function manageFloatingButton() {
         if (btn) btn.remove();
         return;
     }
-    if (btn) return;
+    if (btn) {
+        // The lightbox gets appended to body AFTER us. Same max z-index, DOM-order
+        // wins the tiebreaker, so our button ends up hidden underneath. Bumping it
+        // back to the end keeps it on top.
+        if (document.body.lastElementChild !== btn) {
+            document.body.appendChild(btn);
+        }
+        return;
+    }
 
     loadSettings((settings) => {
-        // Re-check after async — page may have navigated.
+        // The page might have navigated away while storage.get was in flight.
         if (!isPostPage()) return;
         if (document.getElementById('reddit-custom-dl-btn')) return;
 
@@ -319,6 +125,10 @@ function manageFloatingButton() {
     });
 }
 
+// Returns the post's title or an empty string if we can't find a real one.
+// Empty is meaningful: background.js's "if title is missing" rule (omit /
+// placeholder) only fires when the title slot is actually empty. The earlier
+// version fabricated a timestamp here, which silently bypassed that rule.
 function getRawTitle() {
     let rawTitle = "";
     const currentPath = window.location.pathname;
@@ -345,11 +155,51 @@ function getRawTitle() {
     }
 
     if (!rawTitle || rawTitle.trim().length === 0 || rawTitle.toLowerCase().includes('reddit')) {
-        const now = new Date();
-        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        rawTitle = `${months[now.getMonth()]}-${now.getDate()}-${now.getFullYear()}_${now.getHours()}-${now.getMinutes()}`;
+        return '';
     }
     return rawTitle;
+}
+
+// Builds a timestamp string used only as the *default value* in the title prompt
+// when the post has no real title. Honors the user's Date Format / Date Separator
+// / Time Format / Element Separator settings so it matches everything else they
+// see in the live preview. Doesn't get sent to background as a title — empty
+// string still goes through, which is what triggers the missing-title rule.
+function buildFallbackTitle(prefs) {
+    const sep = ((v) => v === 'dash' ? '-' : v === 'space' ? ' ' : v === 'none' ? '' : '_')(
+        prefs.fileSeparatorFormat || prefs.separatorFormat || 'space'
+    );
+    const dateSep = ((v) => v === 'underscore' ? '_' : v === 'space' ? ' ' : v === 'dot' ? '.' : v === 'none' ? '' : '-')(
+        prefs.dateSeparatorFormat || 'dash'
+    );
+    const dateFormat = prefs.dateFormat || 'yyyy-mm-dd';
+    const timeFormat = prefs.timeFormat || '24h';
+
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2, '0');
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const yyyy = now.getFullYear();
+    const yy = yyyy.toString().slice(-2);
+
+    let dateStr;
+    if (dateFormat === 'dd-mm-yyyy' || dateFormat === 'uk') dateStr = `${dd}${dateSep}${mm}${dateSep}${yyyy}`;
+    else if (dateFormat === 'dd-mm-yy')                     dateStr = `${dd}${dateSep}${mm}${dateSep}${yy}`;
+    else if (dateFormat === 'mm-dd-yyyy' || dateFormat === 'us') dateStr = `${mm}${dateSep}${dd}${dateSep}${yyyy}`;
+    else if (dateFormat === 'mm-dd-yy')                     dateStr = `${mm}${dateSep}${dd}${dateSep}${yy}`;
+    else                                                    dateStr = `${yyyy}${dateSep}${mm}${dateSep}${dd}`;
+
+    let hh = now.getHours();
+    const mn = String(now.getMinutes()).padStart(2, '0');
+    let timeStr;
+    if (timeFormat === '12h') {
+        const ampm = hh >= 12 ? 'PM' : 'AM';
+        hh = hh % 12 || 12;
+        timeStr = `${String(hh).padStart(2, '0')}${sep}${mn}${sep}${ampm}`;
+    } else {
+        timeStr = `${String(hh).padStart(2, '0')}${sep}${mn}`;
+    }
+
+    return `Untitled${sep}${dateStr}${sep}${timeStr}`;
 }
 
 function attachClickHandler(btn) {
@@ -357,57 +207,65 @@ function attachClickHandler(btn) {
         e.preventDefault();
         e.stopPropagation();
 
-        const originalText = btn.innerHTML;
-        const currentTheme = btn.getAttribute('data-theme') || 'theme-native';
         const rawTitle = getRawTitle();
         const currentUrl = window.location.href.split('?')[0].split('#')[0].replace(/\/$/, "");
 
         const executeDownload = (finalTitle) => {
-            btn.innerHTML = getLoadingText(currentTheme);
+            // Mark the button busy so applyButtonAppearance won't overwrite the
+            // loading/done message if the user saves popup settings mid-fetch.
+            btn.dataset.busy = 'true';
+            btn.innerHTML = getLoadingText();
 
             chrome.runtime.sendMessage({
                 action: "fetchAndDownload",
                 url: currentUrl,
                 title: finalTitle
             }, (response) => {
+                const themeNow = btn.getAttribute('data-theme') || 'theme-native';
                 if (response && response.success) {
-                    btn.innerHTML = getSuccessText(currentTheme, response.count, response.total);
+                    btn.innerHTML = getSuccessText(themeNow, response.count, response.total);
                 } else {
-                    btn.innerHTML = getFailText(currentTheme);
+                    btn.innerHTML = getFailText(themeNow);
                 }
-                setTimeout(() => { btn.innerHTML = originalText; }, 3000);
+                setTimeout(() => {
+                    delete btn.dataset.busy;
+                    // Pull the freshest label/theme in case the user changed them while we were fetching.
+                    if (cachedSettings) applyButtonAppearance(btn, cachedSettings);
+                    else btn.innerHTML = getButtonContent('');
+                }, 3000);
             });
         };
 
-        chrome.storage.sync.get(['globalPrefs', 'modeState', 'downloadMode', 'useCustomModal'], (data) => {
+        chrome.storage.sync.get(['globalPrefs', 'modeState', 'downloadMode'], (data) => {
             const prefs = data.globalPrefs || {};
             const modeState = data.modeState || {};
             const activeMode = data.downloadMode || prefs.activeMode || 'folder';
 
             const isPromptEnabled = prefs.promptCustomTitle || false;
-            const useCustomModal = data.useCustomModal !== false;
 
             const truncateRule = modeState[activeMode]?.fallbacks?.truncate || 'auto';
 
             let formattedCleanTitle = rawTitle.replace(/[\\/:*?"<>|]/g, "").trim();
             const isTooLong = formattedCleanTitle.length > MAX_SAFE_LENGTH;
 
-            const promptDefault = formattedCleanTitle.substring(0, MAX_SAFE_LENGTH);
+            // The prompt needs *something* in its default field. If the post had
+            // a real title, use it (truncated). Otherwise fall back to a timestamp
+            // built from the user's date/time format settings. Either way,
+            // formattedCleanTitle (the value we'll actually send to background)
+            // stays empty when the post has no title, so the missing-title rule
+            // still fires there.
+            const promptDefault = formattedCleanTitle
+                ? formattedCleanTitle.substring(0, MAX_SAFE_LENGTH)
+                : buildFallbackTitle(prefs);
 
             const askForTitle = (cb) => {
-                if (useCustomModal) {
-                    showTitleModal({ defaultTitle: promptDefault, anchorEl: btn }, cb);
-                } else {
-                    // Native fallback — show default in the message body so user sees it before editing.
-                    const message =
-                        `Default Title:\n${promptDefault}\n\n` +
-                        `Enter a custom title for this gallery:\n` +
-                        `(Your active separators will be applied to spaces unless Title Spaces is set otherwise)`;
-                    const input = window.prompt(message, promptDefault);
-                    if (input !== null) {
-                        let typed = input.trim() || "Untitled_Gallery";
-                        cb(typed.replace(/[\\/:*?"<>|]/g, ""));
-                    }
+                const message =
+                    `Default title:\n${promptDefault}\n\n` +
+                    `Enter a custom title for this gallery (or press Enter to keep the default):`;
+                const input = window.prompt(message, promptDefault);
+                if (input !== null) {
+                    let typed = input.trim() || "Untitled_Gallery";
+                    cb(typed.replace(/[\\/:*?"<>|]/g, ""));
                 }
             };
 
@@ -425,7 +283,7 @@ function attachClickHandler(btn) {
     });
 }
 
-// MutationObserver replaces the old 500ms polling — orders of magnitude less work.
+// We used to poll every 500ms. MutationObserver does the same job for nearly free.
 let observerScheduled = false;
 const scheduleCheck = () => {
     if (observerScheduled) return;
@@ -447,7 +305,8 @@ const startObserving = () => {
 };
 startObserving();
 
-// Reddit is an SPA — react to route changes that don't trigger DOM mutations on body.
+// Reddit is an SPA, so most navigations don't touch <body>. Hook the History API
+// and the hash/popstate events so we still notice when the URL changes.
 const _pushState = history.pushState;
 const _replaceState = history.replaceState;
 history.pushState = function () { _pushState.apply(this, arguments); scheduleCheck(); };
@@ -455,18 +314,14 @@ history.replaceState = function () { _replaceState.apply(this, arguments); sched
 window.addEventListener('popstate', scheduleCheck);
 window.addEventListener('hashchange', scheduleCheck);
 
-// Alt+D keyboard shortcut. Listens at window level (capture phase) so it runs before
-// Reddit's site-wide hotkeys, but bails immediately when:
-//   - the shortcut is disabled in settings
-//   - the user is typing in any input/textarea/contenteditable
-//   - any modifier other than Alt is pressed (so it doesn't collide with Ctrl+Alt+D etc.)
-//   - we're not currently on a post/gallery page (no button to click)
+// Alt+D shortcut. We listen at the window in capture phase so we run before
+// Reddit's own hotkeys can swallow the keystroke.
 function isTypingTarget(target) {
     if (!target) return false;
     if (target.isContentEditable) return true;
     const tag = (target.tagName || '').toLowerCase();
     if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
-    // Reddit's reply composer uses shadow DOM editors; check for role.
+    // Reddit's reply box is a shadow DOM editor; fall back to its role attribute.
     const role = target.getAttribute && target.getAttribute('role');
     if (role === 'textbox' || role === 'combobox') return true;
     return false;
@@ -478,8 +333,6 @@ function handleKeyboardShortcut(e) {
     if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
     if (e.repeat) return;
     if (isTypingTarget(e.target)) return;
-    // If the modal is open, don't hijack — its own input has its own listeners.
-    if (document.getElementById('rgd-modal-root')) return;
 
     const btn = document.getElementById('reddit-custom-dl-btn');
     if (!btn) return;
@@ -492,7 +345,7 @@ window.addEventListener('keydown', handleKeyboardShortcut, true);
 
 chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace !== 'sync') return;
-    const relevant = ['buttonTheme', 'buttonPosition', 'buttonSize', 'customButtonLabel', 'useCustomModal', 'keyboardShortcutEnabled'];
+    const relevant = ['buttonTheme', 'buttonPosition', 'buttonSize', 'customButtonLabel', 'keyboardShortcutEnabled'];
     if (!relevant.some(k => changes[k])) return;
 
     loadSettings((settings) => {

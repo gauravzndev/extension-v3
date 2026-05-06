@@ -7,7 +7,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const saveBtn = document.getElementById('save-configuration-btn');
-    const statusMsg = document.getElementById('status-msg');
     const addStaticTextBtn = document.getElementById('add-static-text-btn');
     const toast = document.getElementById('toast');
 
@@ -24,7 +23,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const timeFormatSelect = document.getElementById('time-format-select');
     const idFormatSelect = document.getElementById('id-format-select');
     const promptTitleToggle = document.getElementById('prompt-title-toggle');
-    const customModalToggle = document.getElementById('custom-modal-toggle');
     const keyboardShortcutToggle = document.getElementById('keyboard-shortcut-toggle');
 
     const fallbacks = {
@@ -120,7 +118,6 @@ document.addEventListener('DOMContentLoaded', () => {
             let sanitizedText = rawText.replace(/[<>:"/\\|?*]/g, '-');
             if (rawText !== sanitizedText) showToast("Special characters were replaced with '-'");
 
-            inputWrapper.innerHTML = '';
             inputWrapper.innerHTML = `<span style="white-space: pre;">${sanitizedText.replace(/ /g, '&nbsp;')}</span>`;
             inputWrapper.setAttribute('data-type', 'user_text');
             inputWrapper.setAttribute('data-generated-text', sanitizedText);
@@ -290,7 +287,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const fileSep = getSeparatorChar(fileSeparatorSelect.value);
 
         const folderData = getDataValues(folderSeparatorSelect.value, indexFormatSelect.value, dateFormatSelect.value, dateSeparatorSelect.value, timeFormatSelect.value, idFormatSelect.value, titleSpaceSelect.value, titleCaseSelect.value);
-        const fileData = getDataValues(fileSeparatorSelect.value, indexFormatSelect.value, dateFormatSelect.value, dateSeparatorSelect.value, timeFormatSelect.value, idFormatSelect.value, titleSpaceSelect.value);
+        const fileData = getDataValues(fileSeparatorSelect.value, indexFormatSelect.value, dateFormatSelect.value, dateSeparatorSelect.value, timeFormatSelect.value, idFormatSelect.value, titleSpaceSelect.value, titleCaseSelect.value);
 
         const { description, box } = getActivePanelPreview(activeMode);
 
@@ -359,7 +356,6 @@ document.addEventListener('DOMContentLoaded', () => {
             modeState,
             toolboxStaticTextDefs: toolboxPills,
             lastUniqueStaticTextId: uniqueStaticTextId,
-            useCustomModal: customModalToggle.checked,
             keyboardShortcutEnabled: keyboardShortcutToggle.checked
         }, () => {
             saveBtn.classList.add('saved');
@@ -406,12 +402,11 @@ document.addEventListener('DOMContentLoaded', () => {
         },
         toolboxStaticTextDefs: [],
         lastUniqueStaticTextId: 0,
-        useCustomModal: true,
         keyboardShortcutEnabled: true,
         modeState: {
-            folder: { folder: [{ type: 'subreddit' }], image: [{ type: 'title' }, { type: 'index' }], fallbacks: { truncate: 'auto', missingTitle: 'placeholder', singleFileIndex: 'never' } },
-            zip: { archive: [{ type: 'title' }], image: [{ type: 'index' }], fallbacks: { truncate: 'auto', missingTitle: 'placeholder', singleFileIndex: 'never' } },
-            individual: { formula: [{ type: 'title' }, { type: 'index' }], fallbacks: { truncate: 'auto', missingTitle: 'placeholder', singleFileIndex: 'never' } }
+            folder: { folder: [{ type: 'subreddit' }], image: [{ type: 'title' }, { type: 'index' }], fallbacks: { truncate: 'auto', missingTitle: 'omit', singleFileIndex: 'never' } },
+            zip: { archive: [{ type: 'title' }], image: [{ type: 'index' }], fallbacks: { truncate: 'auto', missingTitle: 'omit', singleFileIndex: 'never' } },
+            individual: { formula: [{ type: 'title' }, { type: 'index' }], fallbacks: { truncate: 'auto', missingTitle: 'omit', singleFileIndex: 'never' } }
         }
     };
 
@@ -428,7 +423,6 @@ document.addEventListener('DOMContentLoaded', () => {
         timeFormatSelect.value = data.globalPrefs.timeFormat || '24h';
         idFormatSelect.value = data.globalPrefs.idFormat || 'hex';
         promptTitleToggle.checked = data.globalPrefs.promptCustomTitle || false;
-        customModalToggle.checked = data.useCustomModal !== false;
         keyboardShortcutToggle.checked = data.keyboardShortcutEnabled !== false;
         uniqueStaticTextId = data.lastUniqueStaticTextId || 0;
 
@@ -438,7 +432,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelector(`.tab-link[data-mode="${restoredMode}"]`).classList.add('active');
         document.getElementById(`panel-${restoredMode}`).classList.add('active');
 
-        // Clear any existing user_text pills from the toolbox before reinserting them.
+        // Wipe any user_text pills already in the toolbox, then re-add from saved state.
         Array.from(toolbox.querySelectorAll('.pill[data-type="user_text"]')).forEach(p => p.remove());
         if (data.toolboxStaticTextDefs) {
             data.toolboxStaticTextDefs.forEach(pillState => {
@@ -459,7 +453,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const loadFallbacks = (fallbackGroup, fallbackStates) => {
             const states = fallbackStates || {};
             if (fallbackGroup.truncate) fallbackGroup.truncate.value = states.truncate || 'auto';
-            if (fallbackGroup.missingTitle) fallbackGroup.missingTitle.value = states.missingTitle || 'placeholder';
+            if (fallbackGroup.missingTitle) fallbackGroup.missingTitle.value = states.missingTitle || 'omit';
             if (fallbackGroup.placeholderText) fallbackGroup.placeholderText.value = states.placeholderText || '';
             if (fallbackGroup.singleFileIndex) fallbackGroup.singleFileIndex.value = states.singleFileIndex || 'never';
             syncPlaceholderVisibility(fallbackGroup);
@@ -551,7 +545,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         modeState: parsed.modeState,
                         toolboxStaticTextDefs: parsed.toolboxStaticTextDefs || [],
                         lastUniqueStaticTextId: parsed.lastUniqueStaticTextId || 0,
-                        useCustomModal: parsed.useCustomModal !== false,
                         keyboardShortcutEnabled: parsed.keyboardShortcutEnabled !== false,
                         preferredFolder: parsed.preferredFolder,
                         downloadMode: parsed.downloadMode,
@@ -595,8 +588,9 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.storage.sync.get(null, (allData) => {
         let data = allData || {};
 
-        // First-run / corrupted state — merge defaults rather than wiping. Wiping clobbers
-        // unrelated keys like preferredFolder/buttonTheme that the popup may have already set.
+        // First run, or storage got into a weird state. Merge in the defaults instead of
+        // overwriting, otherwise we'd nuke things like preferredFolder/buttonTheme that
+        // the popup already wrote.
         if (!data.globalPrefs || !data.modeState || !data.modeState.folder) {
             data = { ...defaultState, ...data };
             data.globalPrefs = { ...defaultState.globalPrefs, ...(data.globalPrefs || {}) };
@@ -605,8 +599,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 globalPrefs: data.globalPrefs,
                 modeState: data.modeState,
                 toolboxStaticTextDefs: data.toolboxStaticTextDefs || [],
-                lastUniqueStaticTextId: data.lastUniqueStaticTextId || 0,
-                useCustomModal: data.useCustomModal !== false
+                lastUniqueStaticTextId: data.lastUniqueStaticTextId || 0
             });
         }
 

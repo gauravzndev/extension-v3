@@ -1,3 +1,12 @@
+// Inject per-theme styles for the live preview button. Source of truth for the
+// themes lives in themes.js (loaded before us); same data backs the actual
+// floating button on Reddit, so the preview can't drift from reality.
+(function injectThemeStyles() {
+    const el = document.createElement('style');
+    el.textContent = buildThemeStyles('.preview-btn');
+    document.head.appendChild(el);
+})();
+
 const descriptions = {
     folder: "Creates a subfolder named after the post and saves uncompressed images inside it.",
     zip: "Bundles all images into a single .zip file to keep your downloads clutter-free.",
@@ -12,7 +21,6 @@ const positionLabels = {
 };
 
 const sizeLabels = { compact: 'Compact', normal: 'Normal', large: 'Large' };
-const minimalLabelThemes = new Set(['theme-premium', 'theme-mono', 'theme-neon']);
 
 function updateDescription() {
     const mode = document.getElementById('downloadMode').value;
@@ -35,9 +43,6 @@ function updatePreview() {
 
     if (customLabel) {
         labelText.textContent = customLabel;
-        emoji.style.display = minimalLabelThemes.has(theme) ? 'none' : 'inline';
-    } else if (minimalLabelThemes.has(theme)) {
-        labelText.textContent = 'Download';
         emoji.style.display = 'none';
     } else {
         labelText.textContent = 'Download Gallery';
@@ -95,6 +100,10 @@ function restoreOptions() {
         updatePreview();
     });
 }
+
+// Stamp the version from the manifest so the header label doesn't go stale on every release.
+const versionEl = document.getElementById('popupVersion');
+if (versionEl) versionEl.textContent = 'v' + chrome.runtime.getManifest().version;
 
 document.getElementById('downloadMode').addEventListener('change', updateDescription);
 ['buttonTheme', 'buttonPosition', 'buttonSize'].forEach(id => {

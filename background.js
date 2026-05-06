@@ -3,11 +3,57 @@ if (typeof importScripts !== 'undefined') {
 }
 
 const MAX_NAME_LENGTH = 110;
-const PLACEHOLDER_TITLE = 'Gallery_no_title';
+const PLACEHOLDER_TITLE = 'No Title';
 
 const generateBase36Hash = () => Math.random().toString(36).substring(2, 10);
 const cleanName = (str) => str.replace(/[<>:"/\\|?*]/g, '-').trim();
 const cleanPath = (str) => str.replace(/[<>:"|?*]/g, '-').trim();
+
+// Pulls the file extension off a Reddit image URL. The naive `.pop()` returns
+// junk for paths that don't actually contain a dot, so we sanity-check it.
+function getExtFromUrl(url) {
+    const tail = (url || '').split('?')[0].split('#')[0].split('.').pop();
+    return /^[a-z0-9]{1,5}$/i.test(tail) ? tail : 'jpg';
+}
+
+// Reddit serves a lot of previews as WebP. Plenty of Windows image viewers and
+// gallery apps still don't open them cleanly, so we decode and re-encode to JPEG
+// before saving. createImageBitmap + OffscreenCanvas both work in MV3 service
+// workers, so we don't need a content-script roundtrip.
+async function blobToJpeg(blob) {
+    const bitmap = await createImageBitmap(blob);
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    canvas.getContext('2d').drawImage(bitmap, 0, 0);
+    bitmap.close();
+    return canvas.convertToBlob({ type: 'image/jpeg', quality: 0.95 });
+}
+
+function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+}
+
+// Used by Folder and Individual modes. Returns the URL to hand to chrome.downloads
+// plus the extension we should write. Direct passthrough for jpg/png/gif. For WebP
+// we fetch + decode + re-encode + base64 it as a data URL so the saved file is JPEG.
+async function prepareDownload(url) {
+    const ext = getExtFromUrl(url);
+    if (ext.toLowerCase() !== 'webp') return { url, ext };
+    try {
+        const res = await fetch(url);
+        const srcBlob = await res.blob();
+        const jpeg = await blobToJpeg(srcBlob);
+        const dataUrl = await blobToDataUrl(jpeg);
+        return { url: dataUrl, ext: 'jpg' };
+    } catch (e) {
+        console.warn('WebP -> JPEG conversion failed, saving original:', e);
+        return { url, ext };
+    }
+}
 
 const formatDateFromDate = (d, format, sep) => {
     const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -30,7 +76,7 @@ const formatTimeFromDate = (d, format, sep) => {
     if (format === '12h') {
         const ampm = hh >= 12 ? 'PM' : 'AM';
         hh = hh % 12 || 12;
-        return `${String(hh).padStart(2, '0')}${sep}${mm}${sep}${ss}_${ampm}`;
+        return `${String(hh).padStart(2, '0')}${sep}${mm}${sep}${ss}${sep}${ampm}`;
     }
     return `${String(hh).padStart(2, '0')}${sep}${mm}${sep}${ss}`;
 };
@@ -134,7 +180,9 @@ async function executeGalleryDownload(redditUrl, cleanPromptTitle, sendResponse)
                     imageUrls.push(media.s.u.replace(/&amp;/g, '&'));
                 }
             }
-        } else if (post.url && post.url.match(/\.(jpeg|jpg|png|gif)$/i)) {
+        } else if (post.url && post.url.match(/\.(jpeg|jpg|png|gif|webp)(\?|$)/i)) {
+            // WebP is included so single-image posts hosted as .webp don't get dropped.
+            // The query-string allowance handles preview URLs like /foo.jpg?width=...
             imageUrls.push(post.url.replace(/&amp;/g, '&'));
         }
 
@@ -154,7 +202,7 @@ async function executeGalleryDownload(redditUrl, cleanPromptTitle, sendResponse)
             const folderSep = getSep(prefs.folderSeparatorFormat || prefs.separatorFormat || 'space');
             const fileSep = getSep(prefs.fileSeparatorFormat || prefs.separatorFormat || 'space');
 
-            // Title-space behavior: 'default' inherits the active separator; otherwise an explicit char.
+            // 'default' means "use whatever the element separator is". Anything else is a literal char.
             const resolveTitleSep = (val, fallback) => {
                 if (!val || val === 'default') return fallback;
                 if (val === 'keep') return ' ';
@@ -244,7 +292,7 @@ const shouldAddTrailingIndex = (totalUrls, hasIndex, singleFileRule) => {
 async function downloadAsFolder(urls, folderData, fileData, folderSettings, folderSep, fileSep, indexFormat, baseFolder) {
     const folderPills = folderSettings?.folder || [{ type: 'subreddit' }];
     const imagePills = folderSettings?.image || [{ type: 'title' }, { type: 'index' }];
-    const missingTitleRule = folderSettings?.fallbacks?.missingTitle || 'placeholder';
+    const missingTitleRule = folderSettings?.fallbacks?.missingTitle || 'omit';
     const customPlaceholder = folderSettings?.fallbacks?.placeholderText || '';
     const singleFileRule = folderSettings?.fallbacks?.singleFileIndex || 'never';
 
@@ -260,10 +308,10 @@ async function downloadAsFolder(urls, folderData, fileData, folderSettings, fold
 
         if (addTrailing) fileName += `${fileSep}${indexStr}`;
 
-        let ext = urls[i].split('?')[0].split('.').pop() || 'jpg';
-        let fullPath = `${baseFolder}/${folderName}/${fileName}.${ext}`;
+        const prepared = await prepareDownload(urls[i]);
+        const fullPath = `${baseFolder}/${folderName}/${fileName}.${prepared.ext}`;
 
-        const ok = await startDownload({ url: urls[i], filename: fullPath, conflictAction: 'uniquify', saveAs: false });
+        const ok = await startDownload({ url: prepared.url, filename: fullPath, conflictAction: 'uniquify', saveAs: false });
         if (ok) success++;
     }
     return success;
@@ -271,7 +319,7 @@ async function downloadAsFolder(urls, folderData, fileData, folderSettings, fold
 
 async function downloadAsIndividual(urls, fileData, indSettings, fileSep, indexFormat, baseFolder) {
     const formulaPills = indSettings?.formula || [{ type: 'title' }, { type: 'index' }];
-    const missingTitleRule = indSettings?.fallbacks?.missingTitle || 'placeholder';
+    const missingTitleRule = indSettings?.fallbacks?.missingTitle || 'omit';
     const customPlaceholder = indSettings?.fallbacks?.placeholderText || '';
     const singleFileRule = indSettings?.fallbacks?.singleFileIndex || 'never';
 
@@ -286,10 +334,10 @@ async function downloadAsIndividual(urls, fileData, indSettings, fileSep, indexF
 
         if (addTrailing) fileName += `${fileSep}${indexStr}`;
 
-        let ext = urls[i].split('?')[0].split('.').pop() || 'jpg';
-        let fullPath = `${baseFolder}/${fileName}.${ext}`;
+        const prepared = await prepareDownload(urls[i]);
+        const fullPath = `${baseFolder}/${fileName}.${prepared.ext}`;
 
-        const ok = await startDownload({ url: urls[i], filename: fullPath, conflictAction: 'uniquify', saveAs: false });
+        const ok = await startDownload({ url: prepared.url, filename: fullPath, conflictAction: 'uniquify', saveAs: false });
         if (ok) success++;
     }
     return success;
@@ -303,7 +351,7 @@ async function downloadAsZip(urls, folderData, fileData, zipSettings, folderSep,
 
     const archivePills = zipSettings?.archive || [{ type: 'title' }];
     const imagePills = zipSettings?.image || [{ type: 'index' }];
-    const missingTitleRule = zipSettings?.fallbacks?.missingTitle || 'placeholder';
+    const missingTitleRule = zipSettings?.fallbacks?.missingTitle || 'omit';
     const customPlaceholder = zipSettings?.fallbacks?.placeholderText || '';
     const singleFileRule = zipSettings?.fallbacks?.singleFileIndex || 'never';
 
@@ -315,8 +363,19 @@ async function downloadAsZip(urls, folderData, fileData, zipSettings, folderSep,
     let added = 0;
     for (let i = 0; i < urls.length; i++) {
         try {
-            let res = await fetch(urls[i]);
+            const res = await fetch(urls[i]);
             let blob = await res.blob();
+            let ext = getExtFromUrl(urls[i]);
+
+            // Convert WebP in place — we already have the blob, no need to re-fetch.
+            if (blob.type === 'image/webp' || ext.toLowerCase() === 'webp') {
+                try {
+                    blob = await blobToJpeg(blob);
+                    ext = 'jpg';
+                } catch (e) {
+                    console.warn('WebP -> JPEG conversion failed in ZIP, keeping original:', e);
+                }
+            }
 
             const indexStr = formatIndex(i + 1, indexFormat);
             let currentFileData = { ...fileData, index: indexStr };
@@ -324,7 +383,6 @@ async function downloadAsZip(urls, folderData, fileData, zipSettings, folderSep,
 
             if (addTrailing) fileName += `${fileSep}${indexStr}`;
 
-            let ext = urls[i].split('?')[0].split('.').pop() || 'jpg';
             zip.file(`${fileName}.${ext}`, blob);
             added++;
         } catch (err) {
@@ -335,7 +393,7 @@ async function downloadAsZip(urls, folderData, fileData, zipSettings, folderSep,
     if (added === 0) return 0;
 
     const zipBlob = await zip.generateAsync({ type: "blob" });
-    // Service workers can't use URL.createObjectURL — fall back to data URL.
+    // No URL.createObjectURL in service workers, so we go via data URL.
     const dataUrl = await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result);

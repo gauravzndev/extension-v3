@@ -21,6 +21,7 @@
                 "*://*.reddit.com/*"
             ],
             "js": [
+                "themes.js",
                 "content.js"
             ]
         }

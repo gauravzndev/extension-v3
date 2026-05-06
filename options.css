@@ -128,8 +128,6 @@ h2 {
 }
 
 .save-wrapper { display: flex; align-items: center; gap: 14px; }
-#status-msg { font-size: 13px; font-weight: 500; color: var(--google-green); opacity: 0; transition: opacity 0.2s; }
-#status-msg.show { opacity: 1; }
 
 .mock-post-card {
     width: 100%; max-width: 380px;
