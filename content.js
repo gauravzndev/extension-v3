@@ -162,7 +162,7 @@ function getRawTitle() {
 
 // Builds a timestamp string used only as the *default value* in the title prompt
 // when the post has no real title. Honors the user's Date Format / Date Separator
-// / Time Format / Element Separator settings so it matches everything else they
+// / Time Format / Pill Separator settings so it matches everything else they
 // see in the live preview. Doesn't get sent to background as a title — empty
 // string still goes through, which is what triggers the missing-title rule.
 function buildFallbackTitle(prefs) {

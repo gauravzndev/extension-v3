@@ -1,5 +1,7 @@
 # Reddit Picture Gallery Downloader
 
+_Last updated: 2026-05-08_
+
 One-click downloader for Reddit galleries. Save full-resolution photos from any Reddit post — single image, multi-image gallery, or full subreddit thread — straight to your computer with a single press.
 
 **[➡️ Available on the Chrome Web Store](https://chromewebstore.google.com/detail/reddit-picture-gallery-do/abhhhegakoaijhgfefmampphfjgmnapc)**
@@ -10,23 +12,31 @@ Keywords: *Reddit downloader · Reddit image downloader · Reddit gallery downlo
 
 ## 📋 Chrome Web Store description (copy-paste this into the CWS listing)
 
-> 🚀 **Reddit Picture Gallery Downloader (v2.2)**
+> 🚀 **Reddit Picture Gallery Downloader (v2.3)**
 >
 > Download high-resolution Reddit image galleries and posts with a single click. No more right-clicking through twelve images one at a time — press the button, get the whole gallery.
 >
-> Works on every modern Reddit page: post pages, gallery posts, single images, and now the fullscreen lightbox viewer too. Pulls source images straight from Reddit's metadata at original quality, no compression, no watermarking, nothing leaves your machine.
+> Works on every modern Reddit page: post pages, gallery posts, single images, and the fullscreen lightbox viewer. Pulls source images straight from Reddit's metadata at original quality, no compression, no watermarking, nothing leaves your machine.
 >
 > ━━━━━━━━━━━━━━━━━━
-> ✨ **What's new in v2.2**
+> ✨ **What's new in v2.3**
 >
-> • **WebP → JPEG conversion** — Reddit serves a lot of WebP previews these days, but Windows Photos and most gallery apps still don't open them cleanly. The downloader now decodes and re-encodes WebP into JPEG on the fly so every saved file just works. JPG/PNG galleries still use Chrome's native fast download path — only WebP gets the conversion.
-> • **Lightbox support** — The floating Download button now stays visible when you click an image to open Reddit's fullscreen lightbox viewer. Grab the whole gallery from inside the lightbox without backing out to the post.
-> • **Smarter "missing title" defaults** — When a post has no usable title, the downloader now omits the Title pill from the filename by default instead of inserting a placeholder string. Cleaner filenames out of the box. Switch to "Use a placeholder" any time in Settings — the placeholder defaults to "No Title" and is fully editable.
-> • **Cleaner status text** — The button reads "Downloading..." while it works, then "✅ X Files Saved!" when it's done. No emoji clutter mid-download.
-> • **Minimal popup design** — Toned down the popup's branding so it blends with your browser's color scheme.
-> • **Native title prompt** — Optional pre-download "rename this gallery" prompt now uses your browser's built-in dialog, which means Reddit's keyboard shortcuts (J/K/etc.) can't steal your keystrokes while you're typing. Press Enter to keep the default title, type to override, Esc to cancel.
-> • **12-hour time format respects your separator** — Picking dash gets you "02-30-00-PM" instead of the old hardcoded "02-30-00_PM".
-> • **Mid-download safety** — Saving a settings change while a 10-image gallery is still downloading no longer wipes the loading/done message. The button keeps its progress text and refreshes itself when the cycle finishes.
+> • **Per-mode Format Tweaks** — Folder Mode, ZIP Mode, and Individual Mode each carry their own separators, date format, time format, title case, Unique ID style, and so on. Pick dashes for ZIP filenames and underscores for Folder Mode without one bleeding into the other. Older configs are migrated automatically — your existing global settings are copied into all three modes so nothing changes until you start customising per-mode.
+> • **Tips & Recipes page** — Six worked examples showing how to combine pills + format tweaks for common goals (one folder per subreddit, never overwrite a file, group by upload date, share a whole gallery as a ZIP, sync your setup across machines, the Alt + D shortcut). Open it from the Backup & reset row in Settings, from the welcome page, or directly at <code>tips.html</code>.
+> • **Custom dropdown widget** — Every dropdown on the Settings page is now a pill-shaped, fully CSS-styled popup. The OS-rendered blue selection highlight is gone for good; popups always open downward, scroll internally if there are more options than fit, and stay clipped to the viewport.
+> • **Live filename preview** — A handwritten "live preview." card on the left side of the Settings page shows exactly which files your current formula will produce, in a tree layout that mirrors File Explorer (folders, ZIPs, and images each get their own glyph). Long filenames truncate the body but always keep the extension visible.
+> • **Two-tone palette** — Settings page collapsed to a single ink-on-cream palette in light mode and pale-on-dark in dark mode. No more blue Save buttons or green success badges scattered across the chrome.
+> • **Compact popup** — The toolbar popup now fits in a single screen with no scroll. Save and Customize sit side-by-side, and the Customize button is icon-only with a tooltip.
+> • **Reordered Format tweaks** — The 9 controls now read in a cleaner sequence: pill-join rules in row 1, per-pill rendering in row 2, date and time together in row 3.
+>
+> ━━━━━━━━━━━━━━━━━━
+> 🪶 **Carried over from v2.2**
+>
+> • **WebP → JPEG conversion** — Reddit serves a lot of WebP previews, but Windows Photos and most gallery apps still don't open them cleanly. The downloader decodes and re-encodes WebP into JPEG on the fly so every saved file just works.
+> • **Lightbox support** — The floating Download button stays visible when you click an image to open Reddit's fullscreen lightbox viewer.
+> • **Smart "missing title" defaults** — Posts without a usable title omit the Title pill from the filename by default, or use a placeholder string you choose.
+> • **Native title prompt** — Optional pre-download "rename this gallery" prompt uses your browser's built-in dialog so Reddit's keyboard shortcuts can't steal keystrokes while you're typing.
+> • **Mid-download safety** — Saving a settings change while a gallery is still downloading no longer wipes the loading/done message.
 >
 > ━━━━━━━━━━━━━━━━━━
 > 🔥 **Core features**
@@ -72,6 +82,40 @@ Keywords: *Reddit downloader · Reddit image downloader · Reddit gallery downlo
 
 ---
 
+## What's new in v2.3 (engineering changelog)
+
+**Per-mode Format Tweaks**
+- The 9 format controls (Folder Pill Sep, Title Pill Sep, Index Format, Title Case, Title Space Options, Unique ID Format, Date Format, Date Separator, Time Format) used to live in a single global section under `globalPrefs`. They now live per-mode under `modeState[mode].formatPrefs` so each download mode has independent settings. Folder Pill Separator is omitted in Individual Mode (no folder/archive name to assemble).
+- `options.js` generates the Format Tweaks block at the bottom of each panel via `buildFormatOptionsHTML(mode)`. Selects carry `data-mode` + `data-format-key` attributes so they can be looked up cheaply with `getFormatSelect(mode, key)`. The 26 generated selects are enhanced by `enhanceSelect()` in the same pass as the static fallback selects.
+- `applySettings()` runs `ensureFormatPrefsMigrated(data)` on load — if the saved config has legacy `globalPrefs.{folderSeparatorFormat,...}` keys but no per-mode `formatPrefs`, the legacy values are copied into all three modes so existing users transition without losing their setup.
+- `background.js` now reads format prefs from `modeState[activeMode].formatPrefs` with a three-tier fallback chain: per-mode → legacy globalPrefs (for users on a build that pre-dates the split) → hardcoded defaults.
+- `globalPrefs` retains only `promptCustomTitle` and `activeMode`. Everything else moved out.
+
+**Tips & Recipes page**
+- New `tips.html` with 6 worked examples in a responsive 3-column card grid. Each card has a per-tip accent color (top hairline + numbered chip + icon background + corner radial wash all driven by `--accent` / `--accent-bg` / `--accent-soft` CSS vars). Caveat handwritten font on the hero overline.
+- Linked from `welcome.html` ("See more tips →" anchor) and from the `Backup & reset` row in `options.html` (`a.tool-btn-tips` with a lightbulb icon).
+
+**Custom dropdown widget**
+- `enhanceSelect()` in `options.js` wraps every native `<select>` with a body-anchored `position: fixed` listbox so the OS's blue selection highlight never paints. Trigger is a button styled as a pill (`border-radius: 999px`); listbox positions itself below the trigger, caps `max-height` to fit available space, and scrolls internally with the scrollbar hidden via `scrollbar-width: none` + `::-webkit-scrollbar { display: none }`.
+- Listbox positioning includes horizontal edge-detection so the rightmost-column dropdown (Unique ID Format) can't extend off the page. No flip-up — dropdowns always open downward.
+- Native `<select>` stays in the DOM (visually hidden) so `chrome.storage`, form state, and the existing change-event listeners keep working unchanged. `applySettings()` dispatches a synthetic `change` event after programmatic `select.value = ...` so trigger labels stay in sync.
+
+**Settings page UI**
+- Two-tone palette across `options.css` and `popup.html`: cream + ink in light mode, dark + cream in dark mode. Dropped `--google-blue` and `--google-green` everywhere; `accent-color: var(--text-primary)` applied at `:root` to retint native form controls.
+- Live preview tree on the left panel shows the full file structure (downloads/[base]/, then folder/zip line, then 3 image lines) with mode-tinted icons. Filename body truncates with ellipsis but the suffix (`.jpg`, `.zip`, `/`) is `flex-shrink: 0` so the extension is always visible.
+- "live preview." card label uses Caveat handwritten font in warm tan (`#b18a5e` light / `#dbb481` dark).
+- Mock-post carousel (3 peacock slides) uses `object-fit: contain` so the full image is always visible. Each slide's blurred copy fills the letterbox area as ambient backdrop. Bottom-right control cluster combines prev arrow + counter + next arrow into one translucent pill.
+- Format Tweaks reordered: row 1 = pill join rules (Folder Sep · Title Sep · Index), row 2 = per-pill rendering (Title Case · Title Space · Unique ID), row 3 = date/time (Date Format · Date Separator · Time Format).
+- "Folder Separator" → "Folder Pill Separation Character"; "Pill Separation Character" → "Title Pill Separation Character".
+
+**Popup**
+- Header icon swapped from `📥` emoji to the same picture-frame SVG used in the live-preview tree.
+- Save and Customize Naming side-by-side instead of stacked. Customize is icon-only with `title=` tooltip and visually-hidden label for screen readers. Net ~80px vertical saved → fits without scroll.
+- Preview button has `pointer-events: none` so its theme hover styles don't fire (the preview always shows the resting state — what you'll actually see on Reddit).
+
+**Welcome page**
+- Added "See more tips →" anchor below the three feature cards. Subtle inline link with arrow-shift on hover; opens `tips.html` in a new tab.
+
 ## What's new in v2.2 (engineering changelog)
 
 **Download pipeline**
@@ -100,7 +144,7 @@ Keywords: *Reddit downloader · Reddit image downloader · Reddit gallery downlo
 **UI polish**
 - Popup `header-icon` neutralized (no more orange gradient); unused `--reddit` CSS variable removed.
 - Popup version label now reads from `chrome.runtime.getManifest().version` instead of a hardcoded string. Bump the manifest, popup updates automatically.
-- Date Format dropdown labels rewritten from `YYYY MM DD` (which falsely implied a space separator) to `Year, Month, Day`. Time Format labels similarly clarified. Both got info-icon tooltips pointing users at the related Date Separator / Element Separator dropdowns.
+- Date Format dropdown labels rewritten from `YYYY MM DD` (which falsely implied a space separator) to `Year, Month, Day`. Time Format labels similarly clarified. Both got info-icon tooltips pointing users at the related Date Separator / Pill Separator dropdowns.
 - Removed the dead `<span id="status-msg">` element and its CSS — never used after the switch to toast notifications.
 
 ## Setup
@@ -112,10 +156,11 @@ After install, visit `chrome://settings/downloads` and turn **off** "Ask where t
 - `manifest.json` — MV3 manifest
 - `themes.js` — shared theme definitions used by both `content.js` and `popup.html`. Exposes `buildThemeStyles(selector, { important })` so each context can stamp out CSS with the right specificity.
 - `content.js` — floating Download button injected into reddit.com
-- `background.js` — service worker; fetches gallery JSON, builds filenames, drives `chrome.downloads`, converts WebP to JPEG
-- `options.html` / `options.js` / `options.css` — full configuration page
+- `background.js` — service worker; fetches gallery JSON, builds filenames, drives `chrome.downloads`, converts WebP to JPEG. Reads per-mode format prefs from `modeState[activeMode].formatPrefs`.
+- `options.html` / `options.js` / `options.css` — full configuration page. The 9 Format Tweaks per panel are generated at runtime by `buildFormatOptionsHTML(mode)`; native `<select>` controls are wrapped with the custom dropdown widget by `enhanceSelect()`.
 - `popup.html` / `popup.js` — toolbar popup for quick settings
-- `welcome.html` / `welcome.js` — first-run onboarding tab
+- `welcome.html` / `welcome.js` — first-run onboarding tab; links to tips.html
+- `tips.html` — standalone "Tips & Recipes" page (6 worked examples), linked from welcome.html and from the Backup & reset row in options.html
 - `jszip.min.js` — bundled for ZIP mode
 - `Sortable.min.js` — bundled for the drag-and-drop pill builder
 - `tests.md` — pre-release test plan. Run through it (or at least the smoke test at the bottom) before publishing a new version.

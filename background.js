@@ -211,15 +211,26 @@ async function executeGalleryDownload(redditUrl, cleanPromptTitle, sendResponse)
         }
 
         chrome.storage.sync.get(['globalPrefs', 'modeState', 'downloadMode', 'preferredFolder'], async (storage) => {
-            const prefs = storage.globalPrefs || {};
+            const globalPrefs = storage.globalPrefs || {};
             const modeState = storage.modeState || {};
 
-            const activeMode = storage.downloadMode || prefs.activeMode || 'folder';
+            const activeMode = storage.downloadMode || globalPrefs.activeMode || 'folder';
             const baseFolder = storage.preferredFolder ? cleanPath(storage.preferredFolder) : 'reddit_downloads';
 
+            // Format prefs live per-mode: each mode (Folder/ZIP/Individual)
+            // owns its own separators, date format, ID style, etc. We pick
+            // the active mode's prefs here. The fallback chain keeps older
+            // configs working: per-mode formatPrefs first, then legacy
+            // globalPrefs keys (for users on a build that pre-dates the
+            // per-mode split), then hardcoded defaults.
+            const modePrefs = (modeState[activeMode] && modeState[activeMode].formatPrefs) || {};
+            const pref = (key, fallback) => modePrefs[key] != null ? modePrefs[key]
+                                          : globalPrefs[key] != null ? globalPrefs[key]
+                                          : fallback;
+
             const getSep = (val) => val === 'dash' ? '-' : val === 'space' ? ' ' : val === 'none' ? '' : '_';
-            const folderSep = getSep(prefs.folderSeparatorFormat || prefs.separatorFormat || 'space');
-            const fileSep = getSep(prefs.fileSeparatorFormat || prefs.separatorFormat || 'space');
+            const folderSep = getSep(pref('folderSeparatorFormat', globalPrefs.separatorFormat || 'space'));
+            const fileSep = getSep(pref('fileSeparatorFormat', globalPrefs.separatorFormat || 'space'));
 
             // 'default' means "use whatever the element separator is". Anything else is a literal char.
             const resolveTitleSep = (val, fallback) => {
@@ -227,8 +238,9 @@ async function executeGalleryDownload(redditUrl, cleanPromptTitle, sendResponse)
                 if (val === 'keep') return ' ';
                 return getSep(val);
             };
-            const titleSepFolder = resolveTitleSep(prefs.titleSpaceFormat, folderSep);
-            const titleSepFile = resolveTitleSep(prefs.titleSpaceFormat, fileSep);
+            const titleSpaceFormat = pref('titleSpaceFormat', 'default');
+            const titleSepFolder = resolveTitleSep(titleSpaceFormat, folderSep);
+            const titleSepFile = resolveTitleSep(titleSpaceFormat, fileSep);
 
             const getDateSep = (val) => {
                 if (val === 'underscore') return '_';
@@ -237,15 +249,15 @@ async function executeGalleryDownload(redditUrl, cleanPromptTitle, sendResponse)
                 if (val === 'none') return '';
                 return '-';
             };
-            const dateSep = getDateSep(prefs.dateSeparatorFormat || 'dash');
+            const dateSep = getDateSep(pref('dateSeparatorFormat', 'dash'));
 
-            const indexFormat = prefs.indexFormat || 'standard';
-            const uniqueId = generateUniqueId(prefs.idFormat || 'hex');
+            const indexFormat = pref('indexFormat', 'standard');
+            const uniqueId = generateUniqueId(pref('idFormat', 'hex'));
             const fallbackHash = generateBase36Hash();
 
-            const dateFormat = prefs.dateFormat || 'yyyy-mm-dd';
-            const timeFormat = prefs.timeFormat || '24h';
-            const titleCaseFormat = prefs.titleCaseFormat || 'original';
+            const dateFormat = pref('dateFormat', 'yyyy-mm-dd');
+            const timeFormat = pref('timeFormat', '24h');
+            const titleCaseFormat = pref('titleCaseFormat', 'original');
 
             const now = new Date();
             const uploadDateObj = post.created_utc ? new Date(post.created_utc * 1000) : now;

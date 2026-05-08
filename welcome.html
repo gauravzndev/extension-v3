@@ -144,6 +144,37 @@
         }
         .feature-item.setup .badge { background: var(--icon-setup-bg); color: var(--success-text); border-color: var(--success-border); }
 
+        /* "See more tips" CTA — sits below the three feature cards as a
+           lightweight inline link with an arrow. Not a button (no card chrome,
+           no border) so it reads as a soft secondary action — the cards are
+           the headline content, this is the "if you want to go deeper". */
+        .more-tips-link {
+            margin-top: 4px;
+            align-self: flex-start;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 4px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-family: 'Fredoka', 'Quicksand', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            transition: color 0.2s ease, gap 0.2s ease;
+        }
+        .more-tips-link svg {
+            width: 16px;
+            height: 16px;
+            transition: transform 0.2s ease;
+        }
+        .more-tips-link:hover {
+            color: var(--text-primary);
+            gap: 12px;
+        }
+        .more-tips-link:hover svg {
+            transform: translateX(2px);
+        }
+
         @media (max-width: 960px) {
             body { overflow-y: auto; }
             .layout-wrapper { flex-direction: column; height: auto; }
@@ -207,6 +238,17 @@
                     <p>Click the extension's puzzle icon in your toolbar and change your download mode to <strong>ZIP</strong>. Bundle entire galleries into one single file to share them effortlessly. 🤘</p>
                 </div>
             </div>
+
+            <!-- "See more tips" CTA — opens the standalone tips page in a new
+                 tab. The href is relative; resolves to chrome-extension://.../tips.html
+                 since this page is itself an extension page. -->
+            <a href="tips.html" target="_blank" rel="noopener" class="more-tips-link">
+                <span class="more-tips-text">See more tips</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                    <polyline points="12 5 19 12 12 19"></polyline>
+                </svg>
+            </a>
 
         </div>
     </div>

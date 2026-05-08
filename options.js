@@ -1,4 +1,334 @@
+// Custom dropdown widget. Each native <select> on the page is wrapped at
+// startup (and any time we re-render) by enhanceSelect(): the native control
+// stays in the DOM (hidden) so chrome.storage / form state / change events
+// continue to work, while a fully CSS-controlled trigger + listbox handles
+// all rendering. This is the only way to truly escape the OS-rendered option
+// popup (which paints a system-blue selection highlight that no CSS can
+// reliably override across Chromium builds).
+function enhanceSelect(nativeSelect) {
+    if (nativeSelect.dataset.enhanced === 'true') return;
+    nativeSelect.dataset.enhanced = 'true';
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'custom-select';
+
+    const trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.className = 'custom-select-trigger';
+    trigger.innerHTML =
+        '<span class="custom-select-label"></span>' +
+        '<svg class="custom-select-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>';
+
+    const labelEl = trigger.querySelector('.custom-select-label');
+
+    // The listbox lives on <body> so position: fixed escapes any ancestor
+    // overflow:auto (right-panel scrolls; we don't want the popup clipped).
+    const listbox = document.createElement('ul');
+    listbox.className = 'custom-select-listbox';
+    listbox.setAttribute('role', 'listbox');
+
+    function rebuildOptions() {
+        listbox.innerHTML = '';
+        Array.from(nativeSelect.options).forEach((opt) => {
+            const li = document.createElement('li');
+            li.className = 'custom-select-option';
+            li.setAttribute('role', 'option');
+            li.dataset.value = opt.value;
+            li.textContent = opt.textContent;
+            if (opt.value === nativeSelect.value) li.setAttribute('aria-selected', 'true');
+            li.addEventListener('click', (e) => {
+                e.stopPropagation();
+                nativeSelect.value = opt.value;
+                // Bubble a synthetic change so the existing options.js listeners
+                // (updatePreview, syncPlaceholderVisibility, etc.) all fire as
+                // if the user had interacted with the native control directly.
+                nativeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                syncLabel();
+                close();
+            });
+            listbox.appendChild(li);
+        });
+    }
+
+    function syncLabel() {
+        const opt = nativeSelect.options[nativeSelect.selectedIndex];
+        labelEl.textContent = opt ? opt.textContent : '';
+        Array.from(listbox.children).forEach(li => {
+            if (li.dataset.value === nativeSelect.value) li.setAttribute('aria-selected', 'true');
+            else li.removeAttribute('aria-selected');
+        });
+    }
+
+    function position() {
+        const rect = trigger.getBoundingClientRect();
+        const margin = 12;
+
+        // Always anchor the listbox below the trigger. A dropdown that opens
+        // upward feels off — users expect the popup to grow downward as the
+        // word "drop" implies. If the available space below isn't enough for
+        // the natural list height, we cap max-height so the listbox fits
+        // exactly the available space and scrolls internally instead.
+        const spaceBelow = Math.max(120, window.innerHeight - rect.bottom - margin - 6);
+        listbox.style.maxHeight = Math.min(280, spaceBelow) + 'px';
+
+        listbox.style.minWidth = rect.width + 'px';
+        listbox.style.maxWidth = Math.min(360, window.innerWidth - 16) + 'px';
+        listbox.style.left = rect.left + 'px';
+        listbox.style.top = (rect.bottom + 6) + 'px';
+
+        // Horizontal edge detection only — vertical clipping is handled by
+        // max-height above. The rightmost dropdown in a 3-column grid (Unique
+        // ID) can otherwise extend past the page on narrow windows.
+        const lb = listbox.getBoundingClientRect();
+        if (lb.right > window.innerWidth - margin) {
+            const shift = lb.right - (window.innerWidth - margin);
+            listbox.style.left = Math.max(margin, rect.left - shift) + 'px';
+        }
+    }
+
+    let isOpen = false;
+
+    function open() {
+        if (isOpen) return;
+        rebuildOptions();
+        syncLabel();
+        if (listbox.parentNode !== document.body) document.body.appendChild(listbox);
+        position();
+        // Two-frame defer so the transition runs from the closed state.
+        requestAnimationFrame(() => listbox.classList.add('is-open'));
+        wrapper.classList.add('is-open');
+        document.addEventListener('click', onDocClick, true);
+        document.addEventListener('keydown', onKeyDown, true);
+        // Close on any scroll inside the right panel — repositioning a popup
+        // mid-scroll is jittery, and the user can just reopen.
+        window.addEventListener('scroll', closeOnScroll, true);
+        window.addEventListener('resize', closeOnScroll);
+        isOpen = true;
+    }
+
+    function close() {
+        if (!isOpen) return;
+        listbox.classList.remove('is-open');
+        wrapper.classList.remove('is-open');
+        document.removeEventListener('click', onDocClick, true);
+        document.removeEventListener('keydown', onKeyDown, true);
+        window.removeEventListener('scroll', closeOnScroll, true);
+        window.removeEventListener('resize', closeOnScroll);
+        isOpen = false;
+    }
+
+    function closeOnScroll(e) {
+        // Don't close on scroll inside the listbox itself.
+        if (e && listbox.contains(e.target)) return;
+        close();
+    }
+
+    function onDocClick(e) {
+        if (wrapper.contains(e.target) || listbox.contains(e.target)) return;
+        close();
+    }
+
+    function onKeyDown(e) {
+        if (e.key === 'Escape') { close(); trigger.focus(); return; }
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            const opts = Array.from(nativeSelect.options);
+            let idx = nativeSelect.selectedIndex;
+            idx = e.key === 'ArrowDown'
+                ? Math.min(opts.length - 1, idx + 1)
+                : Math.max(0, idx - 1);
+            nativeSelect.value = opts[idx].value;
+            nativeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            syncLabel();
+        } else if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            close();
+        }
+    }
+
+    trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (isOpen) close(); else open();
+    });
+
+    // Programmatic value changes (applySettings does `select.value = ...`) don't
+    // fire native change events — but every loader path in this file already
+    // dispatches one explicitly, so listening here is enough to keep the
+    // visible label in sync with the underlying native select.
+    nativeSelect.addEventListener('change', syncLabel);
+
+    nativeSelect.parentNode.insertBefore(wrapper, nativeSelect);
+    wrapper.appendChild(nativeSelect);
+    wrapper.appendChild(trigger);
+    syncLabel();
+}
+
+// ---- Per-mode Format Options ---------------------------------------------
+//
+// Each download mode (Folder/ZIP/Individual) keeps its own Format Tweaks —
+// separators, date format, ID style, etc. — so a user can have, say, dashes
+// for ZIP filenames and underscores for Folder Mode without one bleeding
+// into the other. The 9 controls are generated programmatically here and
+// injected at the bottom of each panel; this keeps options.html lean and
+// guarantees all three modes stay in sync if we add or rename a setting.
+//
+// Folder Pill Separator is omitted in Individual Mode because that mode
+// has no folder-or-archive name to assemble.
+
+const FORMAT_KEYS_ALL = [
+    'folderSeparatorFormat', 'fileSeparatorFormat', 'indexFormat',
+    'titleCaseFormat', 'titleSpaceFormat', 'idFormat',
+    'dateFormat', 'dateSeparatorFormat', 'timeFormat'
+];
+const FORMAT_KEYS_NO_FOLDER_SEP = FORMAT_KEYS_ALL.filter(k => k !== 'folderSeparatorFormat');
+
+const FORMAT_DEFAULTS = {
+    folderSeparatorFormat: 'space',
+    fileSeparatorFormat: 'space',
+    titleSpaceFormat: 'default',
+    titleCaseFormat: 'original',
+    indexFormat: 'standard',
+    dateFormat: 'yyyy-mm-dd',
+    dateSeparatorFormat: 'dash',
+    timeFormat: '24h',
+    idFormat: 'hex'
+};
+
+function formatKeysForMode(mode) {
+    return mode === 'individual' ? FORMAT_KEYS_NO_FOLDER_SEP : FORMAT_KEYS_ALL;
+}
+
+// Build the entire Format Tweaks block for one mode. Each <select> carries
+// data-format-key + data-mode so it can be located cheaply later, and uses
+// mode-suffixed IDs to avoid clashing across the three panels.
+function buildFormatOptionsHTML(mode) {
+    const id = (k) => `format-${k}-${mode}`;
+    const includesFolderSep = mode !== 'individual';
+
+    const folderSepGroup = includesFolderSep ? `
+        <div class="setting-group">
+            <label>Folder Pill Separation Character<span class="info-icon" data-tooltip="Used inside folder and ZIP archive names to join pills like Subreddit, Author, etc.">?</span></label>
+            <select id="${id('folderSeparatorFormat')}" data-format-key="folderSeparatorFormat" data-mode="${mode}">
+                <option value="space">Space (   )</option>
+                <option value="underscore">Underscore ( _ )</option>
+                <option value="dash">Dash ( - )</option>
+                <option value="none">None (Merged)</option>
+            </select>
+        </div>` : '';
+
+    return `
+        <hr class="section-divider">
+        <div class="format-options-inner">
+            <h2>Format tweaks 🎨</h2>
+            <p class="section-helper">These format choices apply to <strong>${mode === 'individual' ? 'Individual' : mode === 'zip' ? 'ZIP' : 'Folder'} Mode</strong> only. Switch tabs to set them differently for the other modes.</p>
+            <div class="format-settings">
+                ${folderSepGroup}
+                <div class="setting-group">
+                    <label>Title Pill Separation Character<span class="info-icon" data-tooltip="Joins the pills inside an image filename — e.g., between Title and Index. Static text pills are placed without extra separators on either side.">?</span></label>
+                    <select id="${id('fileSeparatorFormat')}" data-format-key="fileSeparatorFormat" data-mode="${mode}">
+                        <option value="space">Space (   )</option>
+                        <option value="underscore">Underscore ( _ )</option>
+                        <option value="dash">Dash ( - )</option>
+                        <option value="none">None (Merged)</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label>Index Format</label>
+                    <select id="${id('indexFormat')}" data-format-key="indexFormat" data-mode="${mode}">
+                        <option value="standard">01 (Standard)</option>
+                        <option value="parentheses">(01) (Parentheses)</option>
+                        <option value="brackets">[01] (Brackets)</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label>Title Case<span class="info-icon" data-tooltip="Transforms the post title's letter case before it lands in the filename. Applies only to the Title pill — other pills like Subreddit and Author are untouched.">?</span></label>
+                    <select id="${id('titleCaseFormat')}" data-format-key="titleCaseFormat" data-mode="${mode}">
+                        <option value="original">Keep Original</option>
+                        <option value="lower">lowercase</option>
+                        <option value="upper">UPPERCASE</option>
+                        <option value="title">Title Case</option>
+                        <option value="sentence">Sentence case</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label>Title Space Options<span class="info-icon" data-tooltip="Controls how spaces inside the post title are replaced. 'Match Title Pill Separator' uses the same character as everything else; 'Keep spaces' preserves the original spacing.">?</span></label>
+                    <select id="${id('titleSpaceFormat')}" data-format-key="titleSpaceFormat" data-mode="${mode}">
+                        <option value="default">Match Title Pill Separator</option>
+                        <option value="keep">Keep spaces in title</option>
+                        <option value="underscore">Underscore ( _ )</option>
+                        <option value="dash">Dash ( - )</option>
+                        <option value="none">None (Merged)</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label>Unique ID Format<span class="info-icon" data-tooltip="Format of the random ID generated when you drop the Unique ID pill into a formula. Useful for guaranteeing every download has a different name.">?</span></label>
+                    <select id="${id('idFormat')}" data-format-key="idFormat" data-mode="${mode}">
+                        <option value="hex">Hex 6 (a1b2c3)</option>
+                        <option value="hex8">Hex 8 (a1b2c3d4)</option>
+                        <option value="numeric">Numeric 6 (987654)</option>
+                        <option value="numeric8">Numeric 8 (12345678)</option>
+                        <option value="alpha6">Alphanumeric (k7p2m9)</option>
+                        <option value="letters">Letters (xKjPqM)</option>
+                        <option value="timestamp">Timestamp (1733123456)</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label>Date Format<span class="info-icon" data-tooltip="Order of year, month, and day. The character between them is set by the Date Separator dropdown next to it.">?</span></label>
+                    <select id="${id('dateFormat')}" data-format-key="dateFormat" data-mode="${mode}">
+                        <option value="yyyy-mm-dd">Year, Month, Day</option>
+                        <option value="dd-mm-yyyy">Day, Month, Year</option>
+                        <option value="dd-mm-yy">Day, Month, Year (2-digit year)</option>
+                        <option value="mm-dd-yyyy">Month, Day, Year</option>
+                        <option value="mm-dd-yy">Month, Day, Year (2-digit year)</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label>Date Separator</label>
+                    <select id="${id('dateSeparatorFormat')}" data-format-key="dateSeparatorFormat" data-mode="${mode}">
+                        <option value="dash">Dash ( - )</option>
+                        <option value="underscore">Underscore ( _ )</option>
+                        <option value="dot">Dot ( . )</option>
+                        <option value="space">Space (   )</option>
+                        <option value="none">None (Merged)</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label>Time Format<span class="info-icon" data-tooltip="The character between hour, minute, and second comes from the Title Pill Separation Character. AM/PM is appended for 12-hour mode.">?</span></label>
+                    <select id="${id('timeFormat')}" data-format-key="timeFormat" data-mode="${mode}">
+                        <option value="24h">24-hour clock</option>
+                        <option value="12h">12-hour clock with AM/PM</option>
+                    </select>
+                </div>
+            </div>
+        </div>`;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+    // Inject the per-mode Format Tweaks blocks BEFORE we enhance selects, so
+    // every select on the page (including the 26 generated ones) gets the
+    // custom dropdown widget in one pass.
+    ['folder', 'zip', 'individual'].forEach(mode => {
+        const panel = document.getElementById(`panel-${mode}`);
+        if (panel) panel.insertAdjacentHTML('beforeend', buildFormatOptionsHTML(mode));
+    });
+
+    // Wrap every native <select> with our custom dropdown widget. Done before
+    // applySettings() runs so the labels paint correctly on first render.
+    document.querySelectorAll('select').forEach(enhanceSelect);
+
+    // Look up a format select by mode + key. Returns null if the key isn't
+    // present for this mode (e.g., folderSeparatorFormat in Individual Mode).
+    function getFormatSelect(mode, key) {
+        return document.querySelector(`select[data-mode="${mode}"][data-format-key="${key}"]`);
+    }
+
+    // Read a single format value from a mode's controls, falling back to the
+    // documented default if the select isn't present (Individual + folderSep).
+    function readFormatValue(mode, key) {
+        const sel = getFormatSelect(mode, key);
+        return sel ? sel.value : FORMAT_DEFAULTS[key];
+    }
+
     const toolbox = document.getElementById('toolbox');
     const dropzones = {
         folder: { folder: document.getElementById('dropzone-folder-folder'), image: document.getElementById('dropzone-folder-image') },
@@ -27,15 +357,8 @@ document.addEventListener('DOMContentLoaded', () => {
         modeDescriptionEl.innerHTML = MODE_DESCRIPTIONS[mode] || '';
     }
 
-    const folderSeparatorSelect = document.getElementById('folder-separator-select');
-    const fileSeparatorSelect = document.getElementById('file-separator-select');
-    const titleSpaceSelect = document.getElementById('title-space-select');
-    const titleCaseSelect = document.getElementById('title-case-select');
-    const indexFormatSelect = document.getElementById('index-format-select');
-    const dateFormatSelect = document.getElementById('date-format-select');
-    const dateSeparatorSelect = document.getElementById('date-separator-select');
-    const timeFormatSelect = document.getElementById('time-format-select');
-    const idFormatSelect = document.getElementById('id-format-select');
+    // Format selects are now per-mode and looked up via getFormatSelect(mode, key)
+    // — see buildFormatOptionsHTML above. The toggles below stay global.
     const promptTitleToggle = document.getElementById('prompt-title-toggle');
     const keyboardShortcutToggle = document.getElementById('keyboard-shortcut-toggle');
 
@@ -179,7 +502,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    [folderSeparatorSelect, fileSeparatorSelect, titleSpaceSelect, titleCaseSelect, indexFormatSelect, dateFormatSelect, dateSeparatorSelect, timeFormatSelect, idFormatSelect].forEach(select => {
+    // Wire change listeners on every per-mode format select. updatePreview
+    // reads from whichever mode's selects are currently active, so listening
+    // on all 26 generated controls keeps the preview accurate when the user
+    // tweaks a setting on any tab.
+    document.querySelectorAll('select[data-format-key]').forEach(select => {
         select.addEventListener('change', updatePreview);
     });
 
@@ -196,12 +523,17 @@ document.addEventListener('DOMContentLoaded', () => {
         // Slides 2 and 3 reference peacock2.jpg / peacock3.jpg, which the user
         // may not have saved yet. Inline onerror="" attributes get blocked by
         // the extension's CSP, so we wire the fallback up here. Each slide
-        // tries its data-fallback once, then gives up to avoid a loop.
+        // tries its data-fallback once, then gives up to avoid a loop. The
+        // surrounding .gallery-slide also has its --bg CSS var swapped so the
+        // blurred backdrop matches the visible foreground.
         track.querySelectorAll('.gallery-img').forEach(img => {
             img.addEventListener('error', function once() {
                 img.removeEventListener('error', once);
                 const fallback = img.getAttribute('data-fallback');
-                if (fallback) img.src = fallback;
+                if (!fallback) return;
+                img.src = fallback;
+                const slide = img.closest('.gallery-slide');
+                if (slide) slide.style.setProperty('--bg', `url('${fallback}')`);
             });
         });
 
@@ -276,7 +608,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const sepChar = getSeparatorChar(separator);
         const dateSepChar = getDateSeparatorChar(dateSeparator);
         const titleSepChar = resolveTitleSep(titleSpace, sepChar);
-        const rawTitle = applyTitleCase("A peacock showing off its feathers", titleCase || 'original');
+        const rawTitle = applyTitleCase("A peacock", titleCase || 'original');
 
         let formattedDate = '';
         if (dateFormat === 'dd-mm-yyyy' || dateFormat === 'uk') formattedDate = `03${dateSepChar}05${dateSepChar}2026`;
@@ -333,21 +665,27 @@ document.addEventListener('DOMContentLoaded', () => {
         return formulaString;
     };
 
-    // Tree icons in Windows-File-Explorer-ish style: two-tone yellow folder
-    // (darker back panel peeking above a lighter front panel), zip = same folder
-    // with a white zipper running down the middle, image = blue sky + sun + green
-    // hills. Colors are baked into each SVG so they look the same regardless of
-    // theme; per-row CSS color tinting is no longer needed.
+    // Monochrome filled-shape icons — every glyph is drawn with currentColor,
+    // so each row's text colour drives the icon and the page stays on its
+    // two-tone palette. The shapes themselves are deliberately chunky and
+    // affordance-loaded (folder gets a tab, image gets an obvious mountain
+    // + sun composition, archive has a visible zipper pull) so each kind
+    // is identifiable at a glance even at 18px.
     const PREVIEW_ICONS = {
-        // Open folder — for the "downloads/[base]/" root line. The front panel is
-        // "tipped open" by drawing it as a leaning trapezoid.
-        download: '<svg viewBox="0 0 24 24"><path d="M2 7a2 2 0 0 1 2-2h6l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7z" fill="#c89a3b"/><path d="M3 10l3-1h17l-2.6 9.5a1.2 1.2 0 0 1-1.16.9H4a1 1 0 0 1-1-1V10z" fill="#f5c25e"/></svg>',
-        // Closed folder — gallery sub-folders in Folder Mode.
-        folder:   '<svg viewBox="0 0 24 24"><path d="M2 7a2 2 0 0 1 2-2h6l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7z" fill="#c89a3b"/><path d="M2 10.2h20V19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8.8z" fill="#f5c25e"/></svg>',
-        // Photo file — blue sky background, soft sun, green hills.
-        image:    '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1.6" fill="#82c5e8"/><circle cx="8" cy="9" r="1.7" fill="#fff5cf"/><path d="M3 17.2l4.2-4.2 3.8 3.8 4-3.6 6 5v1.3a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5v-1.3z" fill="#7ec488"/></svg>',
-        // Zip — yellow folder with a vertical white zipper and tiny teeth.
-        archive:  '<svg viewBox="0 0 24 24"><path d="M2 7a2 2 0 0 1 2-2h6l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7z" fill="#c89a3b"/><path d="M2 10.2h20V19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8.8z" fill="#f5c25e"/><rect x="11.1" y="10.2" width="1.8" height="10.8" fill="#ffffff"/><rect x="11.1" y="12" width="1.8" height="0.55" fill="#c89a3b"/><rect x="11.1" y="14" width="1.8" height="0.55" fill="#c89a3b"/><rect x="11.1" y="16" width="1.8" height="0.55" fill="#c89a3b"/><rect x="11.1" y="18" width="1.8" height="0.55" fill="#c89a3b"/></svg>'
+        // Open folder — for the "downloads/[base]/" root line. Body + a
+        // slightly tilted lid silhouette read as "this folder is open".
+        download: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h5.25a1.5 1.5 0 0 1 1.06.44L12.5 7h6.5a2 2 0 0 1 2 2v1.5H3z" opacity="0.5"/><path d="M2.5 11.2a1 1 0 0 1 1-1.2h17.5a1 1 0 0 1 .98 1.2l-1.55 7.4A1.8 1.8 0 0 1 18.66 20H5.34a1.8 1.8 0 0 1-1.77-1.4z"/></svg>',
+        // Closed folder — gallery sub-folders. Tab on top + slightly lighter
+        // back panel + bold front panel = unambiguously "manila folder".
+        folder:   '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h5.25a1.5 1.5 0 0 1 1.06.44L12.5 7h6.5a2 2 0 0 1 2 2v1.5H3z" opacity="0.5"/><path d="M3 10.5h18a1.5 1.5 0 0 1 1.5 1.5v6.5A1.5 1.5 0 0 1 21 20H4.5A1.5 1.5 0 0 1 3 18.5z"/></svg>',
+        // Photo file — picture frame with a sun and two mountain peaks, all
+        // baked into one filled shape. Reads as "image" at any size because
+        // the silhouette is the universal photo-frame composition.
+        image:    '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 3.5h14a2.5 2.5 0 0 1 2.5 2.5v12A2.5 2.5 0 0 1 19 20.5H5A2.5 2.5 0 0 1 2.5 18V6A2.5 2.5 0 0 1 5 3.5zm15 14.6V14.6l-3.4-3.1a1 1 0 0 0-1.34 0L11.4 15.4l-2.06-1.9a1 1 0 0 0-1.34 0L4 17.2v0.9a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1z" opacity="0.45"/><circle cx="9" cy="9" r="2"/><path d="M20 18.1V14.6l-3.4-3.1a1 1 0 0 0-1.34 0L11.4 15.4l-2.06-1.9a1 1 0 0 0-1.34 0L4 17.2v0.9a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1z"/></svg>',
+        // ZIP archive — folder body + a pronounced vertical zipper with a
+        // pull-tab dangling at the top. The zipper teeth are deliberately
+        // chunky so the "this is a zip" affordance survives at small sizes.
+        archive:  '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h5.25a1.5 1.5 0 0 1 1.06.44L12.5 7h6.5a2 2 0 0 1 2 2v1.5H3z" opacity="0.5"/><path d="M3 10.5h18a1.5 1.5 0 0 1 1.5 1.5v6.5A1.5 1.5 0 0 1 21 20H4.5A1.5 1.5 0 0 1 3 18.5z"/><rect x="11.1" y="11" width="1.8" height="9" fill="var(--bg-card,#fff)"/><rect x="11.1" y="12.4" width="1.8" height="0.8" fill="currentColor"/><rect x="11.1" y="14" width="1.8" height="0.8" fill="currentColor"/><rect x="11.1" y="15.6" width="1.8" height="0.8" fill="currentColor"/><rect x="11.1" y="17.2" width="1.8" height="0.8" fill="currentColor"/><rect x="11.1" y="18.8" width="1.8" height="0.8" fill="currentColor"/><circle cx="12" cy="11.6" r="1.2" fill="var(--bg-card,#fff)" stroke="currentColor" stroke-width="0.6"/></svg>'
     };
 
     const NUM_PREVIEW_IMAGES = 3;
@@ -370,22 +708,48 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function previewRow(iconKey, name, kindClass, indentLevel) {
         const indent = indentLevel ? ` preview-indent-${indentLevel}` : '';
-        return `<div class="preview-row ${kindClass}${indent}"><span class="preview-icon">${PREVIEW_ICONS[iconKey]}</span><span class="preview-name">${escapeHtml(name)}</span></div>`;
+        const safe = escapeHtml(name);
+
+        // Split off the trailing extension (or "/" for folders) so the
+        // ellipsis can chew the body of the filename while keeping the
+        // identifier suffix visible. Without this, long names truncate to
+        // "A peacock showing off its f…" and you can't tell .jpg from .png.
+        let body = safe, suffix = '';
+        const slashAt = safe.lastIndexOf('/');
+        const dotAt = safe.lastIndexOf('.');
+        if (slashAt === safe.length - 1 && slashAt > 0) {
+            body = safe.slice(0, -1);
+            suffix = '/';
+        } else if (dotAt > 0 && dotAt > slashAt && safe.length - dotAt <= 6) {
+            body = safe.slice(0, dotAt);
+            suffix = safe.slice(dotAt);
+        }
+
+        return `<div class="preview-row ${kindClass}${indent}" title="${safe}"><span class="preview-icon">${PREVIEW_ICONS[iconKey]}</span><span class="preview-name"><span class="preview-name-body">${body}</span><span class="preview-name-suffix">${suffix}</span></span></div>`;
     }
 
     function updatePreview() {
         const activeMode = getActiveMode();
 
-        const folderSepGroup = folderSeparatorSelect.closest('.setting-group');
-        if (activeMode === 'individual') folderSepGroup.style.display = 'none';
-        else folderSepGroup.style.display = 'block';
+        // Read every format value from the ACTIVE mode's controls. Each mode
+        // has its own set of selects, so the preview always reflects the
+        // settings the user is looking at on the current tab.
+        const v = (key) => readFormatValue(activeMode, key);
+        const folderSepRaw = v('folderSeparatorFormat');
+        const fileSepRaw   = v('fileSeparatorFormat');
+        const indexFormat  = v('indexFormat');
+        const dateFormat   = v('dateFormat');
+        const dateSepRaw   = v('dateSeparatorFormat');
+        const timeFormat   = v('timeFormat');
+        const idFormat     = v('idFormat');
+        const titleSpace   = v('titleSpaceFormat');
+        const titleCase    = v('titleCaseFormat');
 
-        const folderSep = getSeparatorChar(folderSeparatorSelect.value);
-        const fileSep = getSeparatorChar(fileSeparatorSelect.value);
-        const indexFormat = indexFormatSelect.value;
+        const folderSep = getSeparatorChar(folderSepRaw);
+        const fileSep = getSeparatorChar(fileSepRaw);
 
-        const folderData = getDataValues(folderSeparatorSelect.value, indexFormat, dateFormatSelect.value, dateSeparatorSelect.value, timeFormatSelect.value, idFormatSelect.value, titleSpaceSelect.value, titleCaseSelect.value);
-        const fileData = getDataValues(fileSeparatorSelect.value, indexFormat, dateFormatSelect.value, dateSeparatorSelect.value, timeFormatSelect.value, idFormatSelect.value, titleSpaceSelect.value, titleCaseSelect.value);
+        const folderData = getDataValues(folderSepRaw, indexFormat, dateFormat, dateSepRaw, timeFormat, idFormat, titleSpace, titleCase);
+        const fileData   = getDataValues(fileSepRaw,   indexFormat, dateFormat, dateSepRaw, timeFormat, idFormat, titleSpace, titleCase);
 
         const summary = document.getElementById('preview-summary');
         if (!summary) return;
@@ -414,6 +778,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         summary.innerHTML = lines.join('');
+
+        // Pill badge in the card header — "3 photos" / "3 photos + 1 zip" /
+        // "3 photos + 1 folder". Cheap, but it tells the user at a glance how
+        // many files this configuration will actually produce.
+        const countEl = document.getElementById('preview-summary-count');
+        if (countEl) {
+            const photos = `${NUM_PREVIEW_IMAGES} ${NUM_PREVIEW_IMAGES === 1 ? 'photo' : 'photos'}`;
+            const wrapper = activeMode === 'folder' ? ' + 1 folder'
+                          : activeMode === 'zip'    ? ' + 1 zip'
+                          : '';
+            countEl.textContent = photos + wrapper;
+        }
     }
 
     const pillToState = (pill) => {
@@ -422,17 +798,22 @@ document.addEventListener('DOMContentLoaded', () => {
         else return { type };
     };
 
+    // Snapshot of one mode's format prefs, read from that mode's selects.
+    // Folder Pill Sep is auto-included for Folder/ZIP and skipped for
+    // Individual (no folder/archive name to assemble there).
+    function readFormatPrefs(mode) {
+        const prefs = {};
+        formatKeysForMode(mode).forEach(key => {
+            prefs[key] = readFormatValue(mode, key);
+        });
+        return prefs;
+    }
+
     saveBtn.addEventListener('click', () => {
+        // globalPrefs now only carries truly-global flags (the active tab and
+        // the prompt-for-title toggle). All format-related keys live per-mode
+        // under modeState[mode].formatPrefs — see schema in defaultState.
         const globalPrefs = {
-            folderSeparatorFormat: folderSeparatorSelect.value,
-            fileSeparatorFormat: fileSeparatorSelect.value,
-            titleSpaceFormat: titleSpaceSelect.value,
-            titleCaseFormat: titleCaseSelect.value,
-            indexFormat: indexFormatSelect.value,
-            dateFormat: dateFormatSelect.value,
-            dateSeparatorFormat: dateSeparatorSelect.value,
-            timeFormat: timeFormatSelect.value,
-            idFormat: idFormatSelect.value,
             promptCustomTitle: promptTitleToggle.checked,
             activeMode: getActiveMode()
         };
@@ -447,9 +828,23 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         const modeState = {
-            folder: { folder: saveZoneState(dropzones.folder.folder), image: saveZoneState(dropzones.folder.image), fallbacks: fallbackState(fallbacks.folder) },
-            zip: { archive: saveZoneState(dropzones.zip.archive), image: saveZoneState(dropzones.zip.image), fallbacks: fallbackState(fallbacks.zip) },
-            individual: { formula: saveZoneState(dropzones.individual), fallbacks: fallbackState(fallbacks.individual) }
+            folder: {
+                folder: saveZoneState(dropzones.folder.folder),
+                image: saveZoneState(dropzones.folder.image),
+                fallbacks: fallbackState(fallbacks.folder),
+                formatPrefs: readFormatPrefs('folder')
+            },
+            zip: {
+                archive: saveZoneState(dropzones.zip.archive),
+                image: saveZoneState(dropzones.zip.image),
+                fallbacks: fallbackState(fallbacks.zip),
+                formatPrefs: readFormatPrefs('zip')
+            },
+            individual: {
+                formula: saveZoneState(dropzones.individual),
+                fallbacks: fallbackState(fallbacks.individual),
+                formatPrefs: readFormatPrefs('individual')
+            }
         };
 
         const toolboxPills = Array.from(toolbox.querySelectorAll('.pill[data-type="user_text"]')).map(pillToState);
@@ -489,17 +884,17 @@ document.addEventListener('DOMContentLoaded', () => {
         return pill;
     }
 
+    // Build a fresh formatPrefs object for one mode, copying every key the
+    // mode supports from FORMAT_DEFAULTS. Used by defaultState below and as
+    // the seed for each mode during the migration from old globalPrefs.
+    function defaultFormatPrefsFor(mode) {
+        const out = {};
+        formatKeysForMode(mode).forEach(k => { out[k] = FORMAT_DEFAULTS[k]; });
+        return out;
+    }
+
     const defaultState = {
         globalPrefs: {
-            folderSeparatorFormat: 'space',
-            fileSeparatorFormat: 'space',
-            titleSpaceFormat: 'default',
-            titleCaseFormat: 'original',
-            indexFormat: 'standard',
-            dateFormat: 'yyyy-mm-dd',
-            dateSeparatorFormat: 'dash',
-            timeFormat: '24h',
-            idFormat: 'hex',
             promptCustomTitle: false,
             activeMode: 'folder'
         },
@@ -507,24 +902,69 @@ document.addEventListener('DOMContentLoaded', () => {
         lastUniqueStaticTextId: 0,
         keyboardShortcutEnabled: true,
         modeState: {
-            folder: { folder: [{ type: 'subreddit' }], image: [{ type: 'title' }, { type: 'index' }], fallbacks: { truncate: 'auto', missingTitle: 'omit', singleFileIndex: 'never' } },
-            zip: { archive: [{ type: 'title' }], image: [{ type: 'index' }], fallbacks: { truncate: 'auto', missingTitle: 'omit', singleFileIndex: 'never' } },
-            individual: { formula: [{ type: 'title' }, { type: 'index' }], fallbacks: { truncate: 'auto', missingTitle: 'omit', singleFileIndex: 'never' } }
+            folder: {
+                folder: [{ type: 'subreddit' }],
+                image: [{ type: 'title' }, { type: 'index' }],
+                fallbacks: { truncate: 'auto', missingTitle: 'omit', singleFileIndex: 'never' },
+                formatPrefs: defaultFormatPrefsFor('folder')
+            },
+            zip: {
+                archive: [{ type: 'title' }],
+                image: [{ type: 'index' }],
+                fallbacks: { truncate: 'auto', missingTitle: 'omit', singleFileIndex: 'never' },
+                formatPrefs: defaultFormatPrefsFor('zip')
+            },
+            individual: {
+                formula: [{ type: 'title' }, { type: 'index' }],
+                fallbacks: { truncate: 'auto', missingTitle: 'omit', singleFileIndex: 'never' },
+                formatPrefs: defaultFormatPrefsFor('individual')
+            }
         }
     };
+
+    // Migration helper: pre-2.3 builds stored format prefs in globalPrefs
+    // (a single shared set). After this rev each mode carries its own
+    // formatPrefs. If a saved config is missing per-mode formatPrefs but
+    // has the legacy globalPrefs keys, copy the legacy values into all
+    // three modes so the user keeps their existing setup.
+    function ensureFormatPrefsMigrated(data) {
+        const legacy = data.globalPrefs || {};
+        const ms = data.modeState || {};
+
+        ['folder', 'zip', 'individual'].forEach(mode => {
+            if (!ms[mode]) return;
+            if (ms[mode].formatPrefs) return; // already migrated
+            const seeded = {};
+            formatKeysForMode(mode).forEach(key => {
+                seeded[key] = legacy[key] != null
+                    ? legacy[key]
+                    // The very first build used a single `separatorFormat` for
+                    // both folder and file seps — keep that fallback.
+                    : (key === 'fileSeparatorFormat' || key === 'folderSeparatorFormat')
+                        ? (legacy.separatorFormat || FORMAT_DEFAULTS[key])
+                        : FORMAT_DEFAULTS[key];
+            });
+            ms[mode].formatPrefs = seeded;
+        });
+    }
 
     function applySettings(data) {
         currentBaseFolder = data.preferredFolder || 'reddit_downloads';
 
-        folderSeparatorSelect.value = data.globalPrefs.folderSeparatorFormat || data.globalPrefs.separatorFormat || 'space';
-        fileSeparatorSelect.value = data.globalPrefs.fileSeparatorFormat || data.globalPrefs.separatorFormat || 'space';
-        titleSpaceSelect.value = data.globalPrefs.titleSpaceFormat || 'default';
-        titleCaseSelect.value = data.globalPrefs.titleCaseFormat || 'original';
-        indexFormatSelect.value = data.globalPrefs.indexFormat || 'standard';
-        dateFormatSelect.value = data.globalPrefs.dateFormat || 'yyyy-mm-dd';
-        dateSeparatorSelect.value = data.globalPrefs.dateSeparatorFormat || 'dash';
-        timeFormatSelect.value = data.globalPrefs.timeFormat || '24h';
-        idFormatSelect.value = data.globalPrefs.idFormat || 'hex';
+        // Migrate older configs that stored format prefs globally into the
+        // new per-mode shape. After this call data.modeState[mode].formatPrefs
+        // is guaranteed populated for all three modes.
+        ensureFormatPrefsMigrated(data);
+
+        // Push each mode's saved formatPrefs into that mode's selects.
+        ['folder', 'zip', 'individual'].forEach(mode => {
+            const prefs = (data.modeState[mode] && data.modeState[mode].formatPrefs) || defaultFormatPrefsFor(mode);
+            formatKeysForMode(mode).forEach(key => {
+                const sel = getFormatSelect(mode, key);
+                if (sel) sel.value = prefs[key] != null ? prefs[key] : FORMAT_DEFAULTS[key];
+            });
+        });
+
         promptTitleToggle.checked = data.globalPrefs.promptCustomTitle || false;
         keyboardShortcutToggle.checked = data.keyboardShortcutEnabled !== false;
         uniqueStaticTextId = data.lastUniqueStaticTextId || 0;
@@ -573,6 +1013,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         loadZoneState(dropzones.individual, data.modeState.individual.formula);
         loadFallbacks(fallbacks.individual, data.modeState.individual.fallbacks);
+
+        // Setting .value programmatically doesn't fire change — but the custom
+        // dropdown widgets only update their visible labels in response to a
+        // change event. Fire one on each native select after loading so every
+        // trigger paints the correct current option. The existing change
+        // listeners (updatePreview, syncPlaceholderVisibility) are idempotent,
+        // so running them an extra time here is harmless.
+        document.querySelectorAll('select').forEach(s => {
+            s.dispatchEvent(new Event('change', { bubbles: true }));
+        });
 
         updatePreview();
     }
