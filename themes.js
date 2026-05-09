@@ -70,11 +70,38 @@ function buildThemeStyles(selector, opts) {
     opts = opts || {};
     const suffix = opts.important ? ' !important' : '';
 
+    // Split a declaration block on top-level `;` only — `;` inside parens or
+    // quoted strings is part of a value (e.g. url("data:...; base64, ..."),
+    // a future cubic-bezier with a list, etc.) and must not break declarations.
+    const splitDecls = (css) => {
+        const out = [];
+        let depth = 0, quote = null, buf = '';
+        for (let i = 0; i < css.length; i++) {
+            const ch = css[i];
+            if (quote) {
+                buf += ch;
+                if (ch === quote && css[i - 1] !== '\\') quote = null;
+                continue;
+            }
+            if (ch === '"' || ch === "'") { quote = ch; buf += ch; continue; }
+            if (ch === '(') { depth++; buf += ch; continue; }
+            if (ch === ')') { depth = Math.max(0, depth - 1); buf += ch; continue; }
+            if (ch === ';' && depth === 0) {
+                const t = buf.trim();
+                if (t) out.push(t);
+                buf = '';
+                continue;
+            }
+            buf += ch;
+        }
+        const tail = buf.trim();
+        if (tail) out.push(tail);
+        return out;
+    };
+
     const stamp = (decls) => {
         if (!suffix) return decls;
-        return decls.split(';')
-            .map(d => d.trim())
-            .filter(Boolean)
+        return splitDecls(decls)
             .map(d => d.includes('!important') ? d : d + suffix)
             .join('; ') + ';';
     };

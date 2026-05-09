@@ -1028,7 +1028,14 @@ option {
     transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: var(--shadow-sm);
 }
-input:checked + .slider { background-color: var(--text-primary); }
+/* "On" state uses a soft mint green so the active state reads as active
+   at a glance — the previous ink-on-ink looked off/disabled in peripheral
+   vision. Same green as the existing theme-mint button so the page stays
+   inside its own palette. Slightly lifted in dark mode for legibility. */
+input:checked + .slider { background-color: #10b981; }
+@media (prefers-color-scheme: dark) {
+    input:checked + .slider { background-color: #34d399; }
+}
 input:checked + .slider:before { transform: translateX(20px); }
 .slider.round { border-radius: 24px; }
 .slider.round:before { border-radius: 50%; }

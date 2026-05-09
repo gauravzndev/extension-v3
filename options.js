@@ -251,7 +251,7 @@ function buildFormatOptionsHTML(mode) {
                     </select>
                 </div>
                 <div class="setting-group">
-                    <label>Title Space Options<span class="info-icon" data-tooltip="Controls how spaces inside the post title are replaced. 'Match Title Pill Separator' uses the same character as everything else; 'Keep spaces' preserves the original spacing.">?</span></label>
+                    <label>Title Space Options<span class="info-icon" data-tooltip="Controls how spaces inside the post title are replaced — applies only to the title pill in image filenames. The title pill in folder and ZIP archive names always follows the Folder Pill Separation Character, regardless of this setting.">?</span></label>
                     <select id="${id('titleSpaceFormat')}" data-format-key="titleSpaceFormat" data-mode="${mode}">
                         <option value="default">Match Title Pill Separator</option>
                         <option value="keep">Keep spaces in title</option>
@@ -483,8 +483,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const activeZoneList = [dropzones.folder.folder, dropzones.folder.image, dropzones.zip.archive, dropzones.zip.image, dropzones.individual];
     activeZoneList.forEach(zone => {
         zone.addEventListener('dblclick', (e) => {
-            if (e.target.classList.contains('pill') && e.target.parentElement === zone) {
-                e.target.remove();
+            // user_text pills wrap their label in a <span>, so e.target on a
+            // double-click is the inner span — which has no `pill` class. Use
+            // closest('.pill') so every pill type is actually deletable.
+            const pill = e.target.closest && e.target.closest('.pill');
+            if (pill && pill.parentElement === zone) {
+                pill.remove();
                 updatePreview();
             }
         });
@@ -554,7 +558,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!str) return str;
         if (format === 'lower')    return str.toLowerCase();
         if (format === 'upper')    return str.toUpperCase();
-        if (format === 'title')    return str.split(/(\s+)/).map(t => /\s/.test(t) ? t : (t.charAt(0).toUpperCase() + t.slice(1).toLowerCase())).join('');
+        // Keep this in lock-step with applyTitleCase in background.js — the
+        // live preview must show the same string the saved file will get.
+        if (format === 'title')    return str.split(/(\s+)/).map(t => {
+            if (/\s/.test(t)) return t;
+            if (t.length >= 2 && t === t.toUpperCase() && /[A-Z]/.test(t)) return t;
+            return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+        }).join('');
         if (format === 'sentence') return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
         return str;
     };
@@ -748,7 +758,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const folderSep = getSeparatorChar(folderSepRaw);
         const fileSep = getSeparatorChar(fileSepRaw);
 
-        const folderData = getDataValues(folderSepRaw, indexFormat, dateFormat, dateSepRaw, timeFormat, idFormat, titleSpace, titleCase);
+        // Title Space governs the title pill in image filenames only. For
+        // the folder/archive context, force resolveTitleSep to fall back to
+        // the folder pill separator by passing 'default' — keeps the live
+        // preview in lock-step with background.js's titleSepFolder rule.
+        const folderData = getDataValues(folderSepRaw, indexFormat, dateFormat, dateSepRaw, timeFormat, idFormat, 'default', titleCase);
         const fileData   = getDataValues(fileSepRaw,   indexFormat, dateFormat, dateSepRaw, timeFormat, idFormat, titleSpace, titleCase);
 
         const summary = document.getElementById('preview-summary');
@@ -856,6 +870,15 @@ document.addEventListener('DOMContentLoaded', () => {
             lastUniqueStaticTextId: uniqueStaticTextId,
             keyboardShortcutEnabled: keyboardShortcutToggle.checked
         }, () => {
+            // chrome.storage.sync has a 100KB quota and an 8KB per-key cap.
+            // Without this check, a quota-exceeded error returns silently and
+            // the toast still says "saved successfully" — the user walks away
+            // thinking their formula stuck when it didn't. Real bug.
+            if (chrome.runtime.lastError) {
+                console.error('[Options] storage.sync.set failed:', chrome.runtime.lastError.message);
+                showToast('Save failed: ' + chrome.runtime.lastError.message);
+                return;
+            }
             saveBtn.classList.add('saved');
             showToast('Settings saved successfully', 'success');
             setTimeout(() => saveBtn.classList.remove('saved'), 1800);
@@ -1042,9 +1065,17 @@ document.addEventListener('DOMContentLoaded', () => {
             okBtn.replaceWith(okBtn.cloneNode(true));
             document.getElementById('confirm-cancel').replaceWith(document.getElementById('confirm-cancel').cloneNode(true));
             overlay.removeEventListener('click', backdropHandler);
+            document.removeEventListener('keydown', keyHandler, true);
         };
         const backdropHandler = (e) => { if (e.target === overlay) cleanup(); };
+        // Escape dismisses the dialog the same way Cancel does. Capture phase
+        // so the destructive action is never one Enter-key-press away when
+        // the user just wanted to back out.
+        const keyHandler = (e) => {
+            if (e.key === 'Escape') { e.preventDefault(); cleanup(); }
+        };
         overlay.addEventListener('click', backdropHandler);
+        document.addEventListener('keydown', keyHandler, true);
         document.getElementById('confirm-cancel').addEventListener('click', cleanup);
         document.getElementById('confirm-ok').addEventListener('click', () => {
             cleanup();
@@ -1110,6 +1141,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     Object.keys(cleanData).forEach(k => cleanData[k] === undefined && delete cleanData[k]);
                     chrome.storage.sync.clear(() => {
                         chrome.storage.sync.set(cleanData, () => {
+                            // If the import payload exceeds the 100KB sync
+                            // quota, lastError fires and storage is in a
+                            // half-cleared state. Tell the user explicitly
+                            // so they don't think the import succeeded.
+                            if (chrome.runtime.lastError) {
+                                console.error('[Options] import storage.sync.set failed:', chrome.runtime.lastError.message);
+                                showToast('Import failed: ' + chrome.runtime.lastError.message);
+                                return;
+                            }
                             applySettings({ ...defaultState, ...cleanData });
                             showToast('Settings imported successfully', 'success');
                         });
@@ -1132,6 +1172,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }, () => {
             chrome.storage.sync.clear(() => {
                 chrome.storage.sync.set(defaultState, () => {
+                    if (chrome.runtime.lastError) {
+                        console.error('[Options] reset storage.sync.set failed:', chrome.runtime.lastError.message);
+                        showToast('Reset partial-failed: ' + chrome.runtime.lastError.message);
+                        return;
+                    }
                     applySettings(defaultState);
                     showToast('Settings reset to defaults', 'success');
                 });

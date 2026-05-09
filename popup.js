@@ -201,6 +201,18 @@ function saveOptions() {
         customButtonLabel: customButtonLabel
     }, () => {
         const saveBtn = document.getElementById('saveBtn');
+        // Surface storage failures (most often the 100KB chrome.storage.sync
+        // quota). Without this check the popup would auto-close on a failed
+        // save and the user would walk away thinking their settings stuck.
+        if (chrome.runtime.lastError) {
+            console.error('[Popup] storage.sync.set failed:', chrome.runtime.lastError.message);
+            const status = document.getElementById('status');
+            if (status) {
+                status.textContent = 'Save failed: ' + chrome.runtime.lastError.message;
+                status.classList.add('show');
+            }
+            return;
+        }
         saveBtn.classList.add('saved');
         setTimeout(() => window.close(), 850);
     });
